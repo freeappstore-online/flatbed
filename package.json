@@ -1,0 +1,15 @@
+{
+  "name": "flatbed",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": { "node": ">=22" },
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] },
+  "repository": { "type": "git", "url": "git+https://github.com/freeappstore-online/flatbed.git" },
+  "scripts": {
+    "dev": "pnpm --filter @flatbed/web dev",
+    "build": "pnpm --filter @flatbed/web build",
+    "preview": "pnpm --filter @flatbed/web preview",
+    "typecheck": "pnpm --filter @flatbed/web exec tsc -b",
+    "test": "pnpm --filter @flatbed/web exec tsc -b"
+  }
+}
