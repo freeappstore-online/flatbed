@@ -11,7 +11,8 @@ see freeappstore-online/platform#238.
 - Build: `pnpm build`
 - Test: `pnpm test` (vitest; component tests use jsdom)
 - E2E: `pnpm test:e2e` (Playwright on the production build; `web/e2e/fake-camera.ts` feeds a drawn
-  page into getUserMedia; axe checks every screen in light and dark)
+  page into getUserMedia; every journey in light and dark at Pixel 7 size, axe on every screen).
+  `E2E_BASE_URL=https://flatbed.freeappstore.online pnpm test:e2e` runs them on the live site.
 - Check: `fas check` and `fas screencheck` (on Windows run `pnpm build && fas screencheck
   --skip-build`: its own build step can't spawn pnpm there)
 - Deploy: `git push origin main` (auto-deploys to R2 via GitHub Actions)

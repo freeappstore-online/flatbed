@@ -4,10 +4,11 @@ import { type Page, expect, test } from '@playwright/test'
 import { PDFDocument } from 'pdf-lib'
 import { FRAME, PAGE_CORNERS, pagePhoto, useFakeCamera } from './fake-camera'
 
-// The journey from platform#245 (capture → crop → filter → PDF) in light and
-// dark themes with an accessibility check at each step, plus the library,
-// import when the camera is blocked, and offline use. Each test starts with
-// an empty library in a fresh browser context.
+// Every journey runs in light and dark themes at phone size (Pixel 7): a
+// two-page scan through capture → crop → filter → PDF with an accessibility
+// check at each step (platform#245), the library, import when the camera is
+// blocked, and offline use. Each test starts with an empty library in a fresh
+// browser context. Set E2E_BASE_URL to run against the live site.
 
 test.beforeEach(async ({ page }) => {
   // Keep test runs out of the app's usage statistics.
@@ -46,7 +47,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
     test.use({ colorScheme })
 
-    test('capture → crop → filter → PDF', async ({ page }) => {
+    test('capture → crop → filter → 2-page PDF', async ({ page }) => {
       await useFakeCamera(page)
       await page.goto('/')
       if (colorScheme === 'dark') await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -54,13 +55,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByText('No scans yet.')).toBeVisible()
       await expectAccessible(page, 'the empty library')
 
-      // Capture: the viewfinder shows the fake camera; the shutter takes the photo.
+      // Capture: the viewfinder shows the fake camera; two pages in multi-page mode.
       await page.getByRole('button', { name: 'New scan' }).click()
       const camera = dialog(page, 'Capture pages')
       await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
       await expect(camera).toHaveCSS('background-color', 'rgb(0, 0, 0)') // dark in either theme
       await expectAccessible(page, 'the camera')
-      await camera.getByRole('button', { name: 'Take photo' }).click()
+      await camera.getByRole('button', { name: 'Multi-page' }).click()
+      for (const n of [1, 2]) {
+        await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
+        await camera.getByRole('button', { name: 'Take photo' }).click()
+        await expect(camera.getByRole('img', { name: `Page ${n}` })).toBeVisible()
+      }
+      await camera.getByRole('button', { name: 'Done' }).click()
 
       // Crop: the page's edges are found, close to where the fake camera drew them.
       const crop = dialog(page, 'Crop page 1')
@@ -95,137 +102,154 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page, 'the filter editor')
       await filter.getByRole('button', { name: 'Done' }).click()
 
-      // The saved scan: one straightened, portrait page.
+      // Page 2: its edges are found too, and it starts with the filter chosen for page 1.
+      const crop2 = dialog(page, 'Crop page 2')
+      await expect(crop2.getByText('Found the page. Drag the corners to adjust.')).toBeVisible()
+      await crop2.getByRole('button', { name: 'Done' }).click()
+      const filter2 = dialog(page, 'Filter page 2')
+      await expect(filter2.getByRole('button', { name: 'Black & white' })).toHaveAttribute('aria-pressed', 'true')
+      await filter2.getByRole('button', { name: 'Done' }).click()
+
+      // The saved scan: two straightened pages.
       await expect(page.getByRole('heading', { name: /^Scan \d{4}-\d\d-\d\d \d\d\.\d\d$/ })).toBeVisible()
-      await expect(page.getByRole('heading', { name: '1 page' })).toBeVisible()
-      await expect(page.getByText('Page 1 · Black & white')).toBeVisible()
-      const size = await page.getByRole('img', { name: 'Page 1' }).evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight])
-      expect(size[1]).toBeGreaterThan(size[0])
+      await expect(page.getByRole('heading', { name: '2 pages' })).toBeVisible()
+      for (const n of [1, 2]) await expect(page.getByText(`Page ${n} · Black & white`)).toBeVisible()
+      // Page 2 kept the detected corners: it's the drawn page straightened (longer of each pair of
+      // opposite edges), give or take the edge detector's few pixels.
+      const [tl, tr, br, bl] = PAGE_CORNERS
+      const edge = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+      const straightened = [Math.max(edge(tl, tr), edge(bl, br)), Math.max(edge(tl, bl), edge(tr, br))]
+      await expect.poll(() => page.getByRole('img', { name: 'Page 2' }).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0)
+      const size = await page.getByRole('img', { name: 'Page 2' }).evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight])
+      expect(Math.abs(size[0] - straightened[0]), `page 2 width ${size[0]}`).toBeLessThan(30)
+      expect(Math.abs(size[1] - straightened[1]), `page 2 height ${size[1]}`).toBeLessThan(30)
       await expectAccessible(page, 'the scan')
 
-      // PDF: downloaded (sharing is hidden in this browser), one A4 page.
+      // PDF: downloaded (sharing is hidden in this browser), two A4 pages.
       const downloading = page.waitForEvent('download')
       await page.getByRole('button', { name: 'Download PDF' }).click()
       const download = await downloading
       expect(download.suggestedFilename()).toMatch(/^Scan \d{4}-\d\d-\d\d \d\d\.\d\d\.pdf$/)
       const pdf = await PDFDocument.load(fs.readFileSync((await download.path())!))
-      expect(pdf.getPageCount()).toBe(1)
-      const { width, height } = pdf.getPage(0).getSize()
-      expect([Math.round(width), Math.round(height)]).toEqual([595, 842])
+      expect(pdf.getPageCount()).toBe(2)
+      const sheets = pdf.getPages().map((p) => [Math.round(p.getSize().width), Math.round(p.getSize().height)])
+      // Every sheet is A4; the paper turns to match each page (page 2 is nearly square, so either way).
+      for (const sheet of sheets) expect([...sheet].sort((a, b) => a - b)).toEqual([595, 842])
+      expect(sheets[1][0] > sheets[1][1], 'page 2 sheet matches its orientation').toBe(size[0] > size[1])
       await expect(page.getByText(/^Downloaded Scan .*\.pdf \(\d+(\.\d)? [KM]B\)\.$/)).toBeVisible()
 
       // Saved on the device: still there after a reload.
       await page.goto('/')
-      await expect(page.getByRole('button', { name: /^Scan .*1 page/ })).toBeVisible()
+      await expect(page.getByRole('button', { name: /^Scan .*2 pages/ })).toBeVisible()
       await expectAccessible(page, 'the library')
       await page.getByRole('button', { name: 'Privacy' }).click()
       await expect(page.getByRole('region', { name: /Privacy/ })).toContainText('Images and PDFs never leave it')
       await expectAccessible(page, 'About')
     })
+
+    test('library: multi-page scan, reorder, rename, re-export, delete', async ({ page }) => {
+      await useFakeCamera(page)
+      await page.goto('/')
+      await page.getByRole('button', { name: 'New scan' }).click()
+      const camera = dialog(page, 'Capture pages')
+      await camera.getByRole('button', { name: 'Multi-page' }).click()
+      for (const n of [1, 2, 3]) {
+        await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
+        await camera.getByRole('button', { name: 'Take photo' }).click()
+        await expect(camera.getByText(`${n} page${n > 1 ? 's' : ''}`)).toBeVisible()
+      }
+      await camera.getByRole('button', { name: 'Done' }).click()
+
+      // Each page is offered for crop then filter; keep them all as they are.
+      for (const n of [1, 2, 3]) {
+        await dialog(page, `Crop page ${n}`).getByRole('button', { name: 'Keep as is' }).click()
+        await dialog(page, `Filter page ${n}`).getByRole('button', { name: 'Keep as is' }).click()
+      }
+      await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
+
+      // Reorder: page 1 moves to the end.
+      const srcs = () => page.getByRole('img', { name: /^Page \d$/ }).evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src))
+      const [first, second, third] = await srcs()
+      await page.getByRole('button', { name: 'Move page 1 later' }).click()
+      await page.getByRole('button', { name: 'Move page 2 later' }).click()
+      expect(await srcs()).toEqual([second, third, first])
+
+      // Rename.
+      await page.getByRole('button', { name: 'Rename' }).click()
+      await page.getByLabel('Name').fill('Tenancy agreement')
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(page.getByRole('heading', { name: 'Tenancy agreement' })).toBeVisible()
+
+      // Both survive a reload.
+      await page.reload()
+      await expect(page.getByRole('heading', { name: 'Tenancy agreement' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
+
+      // Re-export, on Letter paper, named after the scan.
+      await page.getByRole('button', { name: 'Letter' }).click()
+      const downloading = page.waitForEvent('download')
+      await page.getByRole('button', { name: 'Download PDF' }).click()
+      const download = await downloading
+      expect(download.suggestedFilename()).toBe('Tenancy agreement.pdf')
+      const pdf = await PDFDocument.load(fs.readFileSync((await download.path())!))
+      expect(pdf.getPageCount()).toBe(3)
+      expect(pdf.getPages().map((p) => p.getSize()).every((s) => [612, 792].includes(Math.round(s.width)))).toBe(true)
+
+      // Delete, after confirming.
+      await page.getByRole('button', { name: 'Delete scan' }).click()
+      await expect(page.getByRole('alertdialog')).toContainText('Delete “Tenancy agreement” and its 3 pages')
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
+      await expect(page.getByText('No scans yet.')).toBeVisible()
+    })
+
+    test('camera blocked: says so, and imports a photo instead', async ({ page }) => {
+      await useFakeCamera(page, { deny: true })
+      await page.goto('/')
+      await page.getByRole('button', { name: 'New scan' }).click()
+      const camera = dialog(page, 'Capture pages')
+      await expect(camera.getByRole('alert')).toContainText('Camera access is off for Flatbed')
+      await expect(camera.getByRole('button', { name: 'Try again' })).toBeVisible()
+      await expectAccessible(page, 'the blocked camera')
+
+      await camera.getByTestId('import-input').setInputFiles(await pagePhoto(page))
+      await expect(dialog(page, 'Crop page 1').getByText('Found the page. Drag the corners to adjust.')).toBeVisible()
+      await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Magic colour' }).click()
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Done' }).click()
+      await expect(page.getByText('Page 1 · Magic colour')).toBeVisible()
+    })
+
+    test('works offline once loaded, including PDF export', async ({ page, context }) => {
+      await useFakeCamera(page)
+      await page.goto('/')
+      await expect(page.getByRole('button', { name: 'New scan' })).toBeVisible()
+      // Wait for the service worker to take control and finish precaching.
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready
+        if (!navigator.serviceWorker.controller) {
+          await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }))
+        }
+      })
+
+      await context.setOffline(true)
+      await page.reload()
+      await expect(page.getByRole('button', { name: 'New scan' })).toBeVisible()
+
+      await shootOnePage(page)
+      await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Greyscale' }).click()
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Done' }).click()
+      await expect(page.getByRole('heading', { name: '1 page' })).toBeVisible()
+
+      // pdf-lib loads on demand; it must come from the precache.
+      const downloading = page.waitForEvent('download')
+      await page.getByRole('button', { name: 'Download PDF' }).click()
+      const pdf = await PDFDocument.load(fs.readFileSync((await (await downloading).path())!))
+      expect(pdf.getPageCount()).toBe(1)
+
+      // The third-party licences open offline too.
+      await page.goto('/third-party-licenses.txt')
+      await expect(page.locator('body')).toContainText('pdf-lib 1.17.1 (MIT)')
+    })
   })
 }
-
-test('library: multi-page scan, reorder, rename, re-export, delete', async ({ page }) => {
-  await useFakeCamera(page)
-  await page.goto('/')
-  await page.getByRole('button', { name: 'New scan' }).click()
-  const camera = dialog(page, 'Capture pages')
-  await camera.getByRole('button', { name: 'Multi-page' }).click()
-  for (const n of [1, 2, 3]) {
-    await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
-    await camera.getByRole('button', { name: 'Take photo' }).click()
-    await expect(camera.getByText(`${n} page${n > 1 ? 's' : ''}`)).toBeVisible()
-  }
-  await camera.getByRole('button', { name: 'Done' }).click()
-
-  // Each page is offered for crop then filter; keep them all as they are.
-  for (const n of [1, 2, 3]) {
-    await dialog(page, `Crop page ${n}`).getByRole('button', { name: 'Keep as is' }).click()
-    await dialog(page, `Filter page ${n}`).getByRole('button', { name: 'Keep as is' }).click()
-  }
-  await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
-
-  // Reorder: page 1 moves to the end.
-  const srcs = () => page.getByRole('img', { name: /^Page \d$/ }).evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src))
-  const [first, second, third] = await srcs()
-  await page.getByRole('button', { name: 'Move page 1 later' }).click()
-  await page.getByRole('button', { name: 'Move page 2 later' }).click()
-  expect(await srcs()).toEqual([second, third, first])
-
-  // Rename.
-  await page.getByRole('button', { name: 'Rename' }).click()
-  await page.getByLabel('Name').fill('Tenancy agreement')
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByRole('heading', { name: 'Tenancy agreement' })).toBeVisible()
-
-  // Both survive a reload.
-  await page.reload()
-  await expect(page.getByRole('heading', { name: 'Tenancy agreement' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
-
-  // Re-export, on Letter paper, named after the scan.
-  await page.getByRole('button', { name: 'Letter' }).click()
-  const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Download PDF' }).click()
-  const download = await downloading
-  expect(download.suggestedFilename()).toBe('Tenancy agreement.pdf')
-  const pdf = await PDFDocument.load(fs.readFileSync((await download.path())!))
-  expect(pdf.getPageCount()).toBe(3)
-  expect(pdf.getPages().map((p) => p.getSize()).every((s) => [612, 792].includes(Math.round(s.width)))).toBe(true)
-
-  // Delete, after confirming.
-  await page.getByRole('button', { name: 'Delete scan' }).click()
-  await expect(page.getByRole('alertdialog')).toContainText('Delete “Tenancy agreement” and its 3 pages')
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
-  await expect(page.getByText('No scans yet.')).toBeVisible()
-})
-
-test('camera blocked: says so, and imports a photo instead', async ({ page }) => {
-  await useFakeCamera(page, { deny: true })
-  await page.goto('/')
-  await page.getByRole('button', { name: 'New scan' }).click()
-  const camera = dialog(page, 'Capture pages')
-  await expect(camera.getByRole('alert')).toContainText('Camera access is off for Flatbed')
-  await expect(camera.getByRole('button', { name: 'Try again' })).toBeVisible()
-  await expectAccessible(page, 'the blocked camera')
-
-  await camera.getByTestId('import-input').setInputFiles(await pagePhoto(page))
-  await expect(dialog(page, 'Crop page 1').getByText('Found the page. Drag the corners to adjust.')).toBeVisible()
-  await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
-  await dialog(page, 'Filter page 1').getByRole('button', { name: 'Magic colour' }).click()
-  await dialog(page, 'Filter page 1').getByRole('button', { name: 'Done' }).click()
-  await expect(page.getByText('Page 1 · Magic colour')).toBeVisible()
-})
-
-test('works offline once loaded, including PDF export', async ({ page, context }) => {
-  await useFakeCamera(page)
-  await page.goto('/')
-  await expect(page.getByRole('button', { name: 'New scan' })).toBeVisible()
-  // Wait for the service worker to take control and finish precaching.
-  await page.evaluate(async () => {
-    await navigator.serviceWorker.ready
-    if (!navigator.serviceWorker.controller) {
-      await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }))
-    }
-  })
-
-  await context.setOffline(true)
-  await page.reload()
-  await expect(page.getByRole('button', { name: 'New scan' })).toBeVisible()
-
-  await shootOnePage(page)
-  await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
-  await dialog(page, 'Filter page 1').getByRole('button', { name: 'Greyscale' }).click()
-  await dialog(page, 'Filter page 1').getByRole('button', { name: 'Done' }).click()
-  await expect(page.getByRole('heading', { name: '1 page' })).toBeVisible()
-
-  // pdf-lib loads on demand; it must come from the precache.
-  const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Download PDF' }).click()
-  const pdf = await PDFDocument.load(fs.readFileSync((await (await downloading).path())!))
-  expect(pdf.getPageCount()).toBe(1)
-
-  // The third-party licences open offline too.
-  await page.goto('/third-party-licenses.txt')
-  await expect(page.locator('body')).toContainText('pdf-lib 1.17.1 (MIT)')
-})
