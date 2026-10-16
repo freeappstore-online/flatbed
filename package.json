@@ -20,6 +20,6 @@
     "build": "pnpm --filter @flatbed/web build",
     "preview": "pnpm --filter @flatbed/web preview",
     "typecheck": "pnpm --filter @flatbed/web exec tsc -b",
-    "test": "pnpm --filter @flatbed/web exec tsc -b"
+    "test": "pnpm --filter @flatbed/web test"
   }
 }
