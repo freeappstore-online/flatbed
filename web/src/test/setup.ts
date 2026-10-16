@@ -22,3 +22,8 @@ if (typeof URL.createObjectURL !== 'function') {
 if (typeof HTMLMediaElement !== 'undefined') {
   HTMLMediaElement.prototype.play = () => Promise.resolve()
 }
+
+// jsdom has no canvas; previews skip drawing when there's no context.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
+}

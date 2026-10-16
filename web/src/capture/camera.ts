@@ -1,13 +1,19 @@
 // Camera and import plumbing for capture. Kept free of React so it can be
 // tested in Node; the browser APIs it needs are passed in.
 
-/** One captured page: the image as shot or imported, before any cropping. */
+import type { Crop } from '../crop/perspective'
+
+/** One captured page. */
 export type Page = {
   id: string
+  /** The page as it is now: cropped and straightened once that's been done. */
   blob: Blob
   /** Object URL for showing the page; revoke it with releasePages. */
   url: string
   source: 'camera' | 'import'
+  /** The image as shot or imported, kept once cropped so the crop can be redone. */
+  original?: Blob
+  crop?: Crop
 }
 
 /** Why the camera isn't showing a picture. */

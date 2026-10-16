@@ -3,6 +3,7 @@ import { initApp } from '@freeappstore/sdk'
 import { BuildInfo, type NavItem, PageHeader, Shell } from '@freeappstore/sdk/ui'
 import { Capture } from './capture/Capture'
 import { type Page, releasePages } from './capture/camera'
+import { CropEditor } from './crop/CropEditor'
 
 const fas = initApp({ appId: 'flatbed' })
 
@@ -17,7 +18,7 @@ const NAV: NavItem[] = [
 // The features planned for v1 (freeappstore-online/platform#238).
 const FEATURES = [
   { name: 'Capture', what: 'Shoot pages with your camera, one or many, or import photos.' },
-  { name: 'Auto-crop', what: 'Finds the page edges for you; drag the corners to adjust.' },
+  { name: 'Auto-crop', what: 'Finds the page edges for you; drag the corners, straighten and rotate.' },
   { name: 'Filters', what: 'Original, greyscale, black & white or magic colour.' },
   { name: 'PDF export', what: 'A multi-page PDF in A4, Letter or fit, to share or download.' },
   { name: 'Your scans', what: 'Rename, reorder pages, delete and export again any time.' },
@@ -51,8 +52,10 @@ export default function App() {
 
 function Scans() {
   const [capturing, setCapturing] = useState(false)
-  // This session's pages. Cropping, filters, export and saving come next (#238).
+  // This session's pages. Filters, export and saving come next (#238).
   const [pages, setPages] = useState<Page[]>([])
+  // Pages waiting to be cropped, in order; new captures join the queue.
+  const [toCrop, setToCrop] = useState<string[]>([])
   const held = useRef(pages)
   held.current = pages
   useEffect(() => () => releasePages(held.current), [])
@@ -60,7 +63,12 @@ function Scans() {
   const remove = (id: string) => {
     releasePages(pages.filter((p) => p.id === id))
     setPages(pages.filter((p) => p.id !== id))
+    setToCrop((q) => q.filter((x) => x !== id))
   }
+
+  const cropping = toCrop.map((id) => pages.find((p) => p.id === id)).find((p) => p !== undefined)
+  const croppingIndex = cropping ? pages.indexOf(cropping) : -1
+  const nextCrop = () => setToCrop((q) => q.filter((id) => id !== cropping?.id))
 
   return (
     <>
@@ -87,9 +95,14 @@ function Scans() {
                 <img src={page.url} alt={`Page ${i + 1}`} className="aspect-[3/4] w-full rounded object-cover" />
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="text-[var(--muted)]">Page {i + 1}</span>
-                  <button type="button" onClick={() => remove(page.id)} className="underline">
-                    Remove<span className="sr-only"> page {i + 1}</span>
-                  </button>
+                  <span className="flex gap-3">
+                    <button type="button" onClick={() => setToCrop([page.id])} className="underline">
+                      Crop<span className="sr-only"> page {i + 1}</span>
+                    </button>
+                    <button type="button" onClick={() => remove(page.id)} className="underline">
+                      Remove<span className="sr-only"> page {i + 1}</span>
+                    </button>
+                  </span>
                 </div>
               </li>
             ))}
@@ -114,7 +127,26 @@ function Scans() {
           onCancel={() => setCapturing(false)}
           onDone={(added) => {
             setPages((all) => [...all, ...added])
+            setToCrop((q) => [...q, ...added.map((p) => p.id)])
             setCapturing(false)
+          }}
+        />
+      )}
+
+      {cropping && (
+        <CropEditor
+          key={cropping.id}
+          blob={cropping.original ?? cropping.blob}
+          initial={cropping.crop}
+          title={`Crop page ${croppingIndex + 1}`}
+          onSkip={nextCrop}
+          onApply={(blob, crop) => {
+            const url = URL.createObjectURL(blob)
+            releasePages([cropping])
+            setPages((all) =>
+              all.map((p) => (p.id === cropping.id ? { ...p, original: p.original ?? p.blob, blob, url, crop } : p)),
+            )
+            nextCrop()
           }}
         />
       )}
@@ -147,7 +179,7 @@ function About() {
 function ComingSoon() {
   return (
     <p className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-4 text-[var(--muted)]">
-      Flatbed is in development. Capture works today; cropping, filters, PDF export and saved scans are coming soon.
+      Flatbed is in development. Capture and cropping work today; filters, PDF export and saved scans are coming soon.
     </p>
   )
 }
