@@ -43,12 +43,12 @@ export async function openPicture(blob: Blob): Promise<Picture> {
   }
 }
 
-/** Encodes pixels as a JPEG. */
-export function encodeJpeg(pixels: Pixels): Promise<Blob> {
+/** Encodes pixels as a JPEG (quality 0–1). */
+export function encodeJpeg(pixels: Pixels, quality = 0.92): Promise<Blob> {
   const { c, ctx } = canvas(pixels.width, pixels.height)
   ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height), 0, 0)
   return new Promise((resolve, reject) =>
-    c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Couldn't encode the page"))), 'image/jpeg', 0.92),
+    c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Couldn't encode the page"))), 'image/jpeg', quality),
   )
 }
 

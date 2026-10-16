@@ -4,6 +4,7 @@ import { BuildInfo, type NavItem, PageHeader, Shell } from '@freeappstore/sdk/ui
 import { Capture } from './capture/Capture'
 import { type Page, releasePages, uncropped, unfiltered } from './capture/camera'
 import { CropEditor } from './crop/CropEditor'
+import { ExportPanel } from './export/ExportPanel'
 import { FilterEditor } from './filters/FilterEditor'
 import { FILTERS, type Filter } from './filters/filters'
 import { filterBlob } from './filters/render'
@@ -58,7 +59,7 @@ type Step = { id: string; kind: 'crop' | 'filter' }
 
 function Scans() {
   const [capturing, setCapturing] = useState(false)
-  // This session's pages. Export and saving come next (#238).
+  // This session's pages. Saving them comes next (#238).
   const [pages, setPages] = useState<Page[]>([])
   // Edits waiting their turn: each new page is cropped, then filtered.
   const [steps, setSteps] = useState<Step[]>([])
@@ -136,6 +137,7 @@ function Scans() {
           </ol>
         </section>
       )}
+      {pages.length > 0 && <ExportPanel pages={pages.map((p) => p.blob)} />}
 
       <div className="mt-8">
         <ComingSoon />
@@ -211,6 +213,12 @@ function About() {
         </a>
         .
       </p>
+      <p className="mt-4 text-[var(--muted)]">
+        PDFs are made with pdf-lib (MIT licence).{' '}
+        <a href="/third-party-licenses.txt" className="underline">
+          Third-party licences
+        </a>
+      </p>
     </>
   )
 }
@@ -219,7 +227,7 @@ function About() {
 function ComingSoon() {
   return (
     <p className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-4 text-[var(--muted)]">
-      Flatbed is in development. Capture, cropping and filters work today; PDF export and saved scans are coming soon.
+      Flatbed is in development. Capture, cropping, filters and PDF export work today; saved scans are coming soon.
     </p>
   )
 }
