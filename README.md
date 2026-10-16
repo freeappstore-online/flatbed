@@ -1,11 +1,13 @@
 # Flatbed
 
-**Coming soon — scan documents to PDF on your device: auto-crop, filters and multi-page export.
+**Scan documents to PDF on your device: auto-crop, filters and multi-page export.
 Nothing leaves your phone.** A free app on [FreeAppStore](https://freeappstore.online), live at
 https://flatbed.freeappstore.online.
 
-Right now this is a shell: it lists the planned features, but none of them work yet. Progress is
-tracked in
+Shoot pages with the camera or import photos; Flatbed finds the page edges, straightens them,
+cleans them up (greyscale, black & white or magic colour) and makes a multi-page PDF in A4, Letter
+or fit, to share or download. Scans are saved in this browser, to rename, reorder, delete and
+export again. Images and PDFs never leave the device. Built under
 [freeappstore-online/platform#238](https://github.com/freeappstore-online/platform/issues/238).
 
 ## Develop

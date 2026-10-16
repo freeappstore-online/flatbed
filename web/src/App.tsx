@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { initApp } from '@freeappstore/sdk'
 import { BuildInfo, type NavItem, PageHeader, Shell } from '@freeappstore/sdk/ui'
-import { Capture } from './capture/Capture'
-import { type Page, releasePages, uncropped, unfiltered } from './capture/camera'
-import { CropEditor } from './crop/CropEditor'
-import { ExportPanel } from './export/ExportPanel'
-import { FilterEditor } from './filters/FilterEditor'
-import { FILTERS, type Filter } from './filters/filters'
-import { filterBlob } from './filters/render'
+import { PrivacyNote } from './Privacy'
+import { Library } from './library/Library'
+import { ScanView } from './library/ScanView'
+import { scans } from './library/scans'
 
 const fas = initApp({ appId: 'flatbed' })
 
@@ -19,7 +16,7 @@ const NAV: NavItem[] = [
   { label: 'About', href: '/about', title: 'About — Flatbed' },
 ]
 
-// The features planned for v1 (freeappstore-online/platform#238).
+// What Flatbed does (freeappstore-online/platform#238).
 const FEATURES = [
   { name: 'Capture', what: 'Shoot pages with your camera, one or many, or import photos.' },
   { name: 'Auto-crop', what: 'Finds the page edges for you; drag the corners, straighten and rotate.' },
@@ -29,119 +26,57 @@ const FEATURES = [
   { name: 'Private', what: 'Images and PDFs are made on your device and never leave it.' },
 ]
 
+/** Where the app is: the path, plus the open scan's id kept in history state (never in the URL). */
+type Route = { path: string; scan?: string; edit?: string[] }
+
+const current = (): Route => ({ path: window.location.pathname, scan: window.history.state?.scan })
+
 export default function App() {
-  const [path, setPath] = useState(() => window.location.pathname)
+  const [route, setRoute] = useState(current)
 
   // Keep the screen in step with the browser's back and forward buttons.
   useEffect(() => {
-    const sync = () => setPath(window.location.pathname)
+    const sync = () => setRoute(current())
     window.addEventListener('popstate', sync)
     return () => window.removeEventListener('popstate', sync)
   }, [])
 
   // Nav clicks switch screens without a page load. Shell scrolls to the top
-  // and moves focus to the new screen's PageHeader.
-  const navigate = (href: string) => {
-    window.history.pushState(null, '', href)
-    setPath(href)
+  // and moves focus to the new screen's PageHeader. A scan's id stays out of
+  // the address (which the store's page-view counts record).
+  const navigate = (href: string, scan?: string, edit?: string[]) => {
+    window.history.pushState(scan ? { scan } : null, '', href)
+    setRoute({ path: href, scan, edit })
   }
 
+  let screen
+  if (route.path === '/about') screen = <About />
+  else if (route.path === '/scan' && route.scan)
+    screen = (
+      <ScanView key={route.scan} store={scans} scanId={route.scan} edit={route.edit} onClose={() => navigate('/')} />
+    )
+  else
+    screen = (
+      <Library store={scans} onOpen={(id, edit) => navigate('/scan', id, edit)} onPrivacy={() => navigate('/about')} />
+    )
+
   return (
-    <Shell app={fas} appName="Flatbed" nav={NAV} onNavigate={navigate}>
-      <div className="mx-auto w-full max-w-3xl p-4 sm:p-8">{path === '/about' ? <About /> : <Scans />}</div>
+    <Shell app={fas} appName="Flatbed" nav={NAV} onNavigate={(href) => navigate(href)}>
+      <div className="mx-auto w-full max-w-3xl p-4 sm:p-8">{screen}</div>
       <BuildInfo />
     </Shell>
   )
 }
 
-/** One edit waiting for a page. */
-type Step = { id: string; kind: 'crop' | 'filter' }
-
-function Scans() {
-  const [capturing, setCapturing] = useState(false)
-  // This session's pages. Saving them comes next (#238).
-  const [pages, setPages] = useState<Page[]>([])
-  // Edits waiting their turn: each new page is cropped, then filtered.
-  const [steps, setSteps] = useState<Step[]>([])
-  // New pages start with the filter chosen last, so a run of pages is quick.
-  const [lastFilter, setLastFilter] = useState<Filter>('original')
-  const held = useRef(pages)
-  held.current = pages
-  useEffect(() => () => releasePages(held.current), [])
-
-  const remove = (id: string) => {
-    releasePages(pages.filter((p) => p.id === id))
-    setPages(pages.filter((p) => p.id !== id))
-    setSteps((q) => q.filter((s) => s.id !== id))
-  }
-
-  // The first waiting step whose page still exists.
-  const step = steps.find((s) => pages.some((p) => p.id === s.id))
-  const editing = step && pages.find((p) => p.id === step.id)!
-  const editingNumber = editing ? pages.indexOf(editing) + 1 : 0
-  const nextStep = () => setSteps((q) => q.filter((s) => s !== step))
-
-  // Swaps in a page's new image (and whatever else changed), freeing the old one.
-  const update = (id: string, blob: Blob, changes: Partial<Page>) => {
-    const url = URL.createObjectURL(blob)
-    releasePages(pages.filter((p) => p.id === id))
-    setPages((all) =>
-      all.map((p) => (p.id === id ? { ...p, original: p.original ?? p.blob, ...changes, blob, url } : p)),
-    )
-  }
-
+function About() {
   return (
     <>
-      <PageHeader
-        title="Flatbed"
-        description="Scan documents on your device with the camera, or import photos. Nothing leaves your phone."
-      />
-      <button
-        type="button"
-        onClick={() => setCapturing(true)}
-        className="w-full rounded-[var(--radius)] bg-[var(--ink)] px-4 py-4 text-lg font-semibold text-[var(--paper)] hover:opacity-90 sm:w-auto"
-      >
-        {pages.length > 0 ? 'Add pages' : 'Scan a document'}
-      </button>
-
-      {pages.length > 0 && (
-        <section className="mt-6" aria-labelledby="pages-heading">
-          <h2 id="pages-heading" className="font-semibold text-[var(--ink)]">
-            {pages.length} {pages.length === 1 ? 'page' : 'pages'}
-          </h2>
-          <ol className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {pages.map((page, i) => (
-              <li key={page.id} className="rounded-[var(--radius)] border border-[var(--line)] p-2">
-                <img src={page.url} alt={`Page ${i + 1}`} className="aspect-[3/4] w-full rounded object-cover" />
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-[var(--muted)]">
-                    Page {i + 1}
-                    {page.filter && page.filter !== 'original' && (
-                      <span className="block text-xs">{FILTERS.find((f) => f.id === page.filter)?.name}</span>
-                    )}
-                  </span>
-                  <span className="flex gap-3">
-                    <button type="button" onClick={() => setSteps([{ id: page.id, kind: 'crop' }])} className="underline">
-                      Crop<span className="sr-only"> page {i + 1}</span>
-                    </button>
-                    <button type="button" onClick={() => setSteps([{ id: page.id, kind: 'filter' }])} className="underline">
-                      Filter<span className="sr-only"> page {i + 1}</span>
-                    </button>
-                    <button type="button" onClick={() => remove(page.id)} className="underline">
-                      Remove<span className="sr-only"> page {i + 1}</span>
-                    </button>
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-      {pages.length > 0 && <ExportPanel pages={pages.map((p) => p.blob)} />}
-
-      <div className="mt-8">
-        <ComingSoon />
-      </div>
+      <PageHeader title="About" />
+      <p className="text-[var(--muted)]">
+        Flatbed turns your phone's camera into a document scanner: capture pages, crop and straighten them, clean
+        them up and save them as a PDF. Everything happens on your device; your images and PDFs are never uploaded.
+        No account, no ads, no subscription.
+      </p>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {FEATURES.map((feature) => (
           <li key={feature.name} className="rounded-[var(--radius)] border border-[var(--line)] p-4">
@@ -150,84 +85,17 @@ function Scans() {
           </li>
         ))}
       </ul>
-
-      {capturing && (
-        <Capture
-          onCancel={() => setCapturing(false)}
-          onDone={(added) => {
-            setPages((all) => [...all, ...added])
-            setSteps((q) => [...q, ...added.flatMap((p): Step[] => [{ id: p.id, kind: 'crop' }, { id: p.id, kind: 'filter' }])])
-            setCapturing(false)
-          }}
-        />
-      )}
-
-      {editing && step.kind === 'crop' && (
-        <CropEditor
-          key={editing.id}
-          blob={uncropped(editing)}
-          initial={editing.crop}
-          title={`Crop page ${editingNumber}`}
-          onSkip={nextStep}
-          onApply={async (cropped, crop) => {
-            // A page that already has a filter gets it again on the new crop.
-            const blob = editing.filter ? await filterBlob(cropped, editing.filter).catch(() => cropped) : cropped
-            update(editing.id, blob, { cropped, crop })
-            nextStep()
-          }}
-        />
-      )}
-
-      {editing && step.kind === 'filter' && (
-        <FilterEditor
-          key={editing.id}
-          blob={unfiltered(editing)}
-          initial={editing.filter ?? lastFilter}
-          title={`Filter page ${editingNumber}`}
-          onSkip={nextStep}
-          onApply={(filter, blob) => {
-            update(editing.id, blob, { filter })
-            setLastFilter(filter)
-            nextStep()
-          }}
-        />
-      )}
-    </>
-  )
-}
-
-function About() {
-  return (
-    <>
-      <PageHeader title="About" />
-      <ComingSoon />
-      <p className="mt-4 text-[var(--muted)]">
-        Flatbed will turn your phone's camera into a document scanner: capture pages, crop and
-        straighten them, clean them up and save them as a PDF. Everything will happen on your device;
-        your images and PDFs are never uploaded. No account, no ads, no subscription.
-      </p>
-      <p className="mt-4 text-[var(--muted)]">
+      <PrivacyNote />
+      <p className="mt-6 text-[var(--muted)]">
         Flatbed is a free, MIT-licensed app on{' '}
         <a href="https://freeappstore.online" className="underline">
           FreeAppStore
         </a>
-        .
-      </p>
-      <p className="mt-4 text-[var(--muted)]">
-        PDFs are made with pdf-lib (MIT licence).{' '}
+        . PDFs are made with pdf-lib (MIT) and scans are stored with idb (ISC).{' '}
         <a href="/third-party-licenses.txt" className="underline">
           Third-party licences
         </a>
       </p>
     </>
-  )
-}
-
-// Says plainly which features work yet.
-function ComingSoon() {
-  return (
-    <p className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-4 text-[var(--muted)]">
-      Flatbed is in development. Capture, cropping, filters and PDF export work today; saved scans are coming soon.
-    </p>
   )
 }

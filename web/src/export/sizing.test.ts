@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PAPER, QUALITIES, formatBytes, pdfName, placement, targetPixels } from './sizing'
+import { PAPER, QUALITIES, formatBytes, pdfName, placement, scanName, targetPixels } from './sizing'
 
 const A4 = { w: 595.28, h: 841.89 }
 
@@ -110,8 +110,16 @@ describe('targetPixels', () => {
 })
 
 describe('names and sizes', () => {
-  it('names the file by local date and time', () => {
-    expect(pdfName(new Date(2026, 9, 6, 9, 5))).toBe('Scan 2026-10-06 09.05.pdf')
+  it('names a new scan by local date and time', () => {
+    expect(scanName(new Date(2026, 9, 6, 9, 5))).toBe('Scan 2026-10-06 09.05')
+  })
+
+  it("makes a safe PDF file name from the scan's name", () => {
+    expect(pdfName('Scan 2026-10-06 09.05')).toBe('Scan 2026-10-06 09.05.pdf')
+    expect(pdfName('Invoices: Q3/Q4 *final*')).toBe('Invoices- Q3-Q4 -final-.pdf')
+    expect(pdfName(' ..hidden. ')).toBe('hidden.pdf')
+    expect(pdfName('???')).toBe('Scan.pdf')
+    expect(pdfName('x'.repeat(300))).toBe('x'.repeat(100) + '.pdf')
   })
 
   it('formats byte counts', () => {

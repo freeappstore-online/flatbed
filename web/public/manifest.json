@@ -1,7 +1,7 @@
 {
   "name": "Flatbed",
   "short_name": "Flatbed",
-  "description": "Coming soon — scan documents to PDF on your device: auto-crop, filters and multi-page export. Nothing leaves your phone.",
+  "description": "Scan documents to PDF on your device: auto-crop, filters and multi-page export. Nothing leaves your phone.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",

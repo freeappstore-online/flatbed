@@ -30,7 +30,7 @@ describe('Capture with a camera', () => {
     expect(screen.getByLabelText('Camera viewfinder')).toBeTruthy()
     await live()
     expect(media.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ audio: false }))
-    expect(document.activeElement).toBe(shutter())
+    await waitFor(() => expect(document.activeElement).toBe(shutter()))
   })
 
   it('hands back one page per shot in single-page mode', async () => {

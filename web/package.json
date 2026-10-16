@@ -7,12 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "third-party-licenses": "node scripts/third-party-licenses.mjs"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/manrope": "^5.3.0",
     "@freeappstore/sdk": "^0.15.1",
+    "idb": "^8.0.4",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
@@ -24,6 +26,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.1.3",
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.2",

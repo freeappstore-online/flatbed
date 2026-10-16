@@ -130,8 +130,8 @@ export function releasePages(pages: Page[], revoke: (url: string) => void = (url
   pages.forEach((page) => revoke(page.url))
 }
 
-/** Moves the page at `from` by `by` places (-1 earlier, +1 later), clamped to the ends. */
-export function movePage(pages: Page[], from: number, by: number): Page[] {
+/** Moves the item at `from` by `by` places (-1 earlier, +1 later), clamped to the ends. */
+export function movePage<T>(pages: T[], from: number, by: number): T[] {
   const to = Math.max(0, Math.min(pages.length - 1, from + by))
   if (from < 0 || from >= pages.length || to === from) return pages
   const next = pages.slice()

@@ -13,7 +13,8 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     }) as MediaQueryList
 }
 
-if (typeof URL.createObjectURL !== 'function') {
+// Node's own createObjectURL only takes Node Blobs, not jsdom's; components only need a string.
+if (typeof window !== 'undefined' || typeof URL.createObjectURL !== 'function') {
   let n = 0
   URL.createObjectURL = () => `blob:test/${++n}`
   URL.revokeObjectURL = () => {}

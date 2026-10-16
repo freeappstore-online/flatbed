@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { canShareFiles, deliver } from './share'
-import { PAPER_SIZES, type PaperSize, QUALITIES, type Quality, formatBytes, pdfName } from './sizing'
+import { PAPER_SIZES, type PaperSize, QUALITIES, type Quality, formatBytes, pdfName, scanName } from './sizing'
 
 type Exporter = (
   pages: Blob[],
@@ -21,12 +21,15 @@ type Status =
 /** Paper size, quality and the button that makes the PDF and shares or downloads it. */
 export function ExportPanel({
   pages,
+  name,
   exporter = lazyExport,
   hand = deliver,
   share = canShareFiles(),
 }: {
   /** The pages' final images, in order. */
   pages: Blob[]
+  /** The scan's name, used for the file name. */
+  name?: string
   /** For tests. */
   exporter?: Exporter
   hand?: (pdf: Blob, name: string) => Promise<'shared' | 'downloaded' | 'cancelled'>
@@ -41,9 +44,9 @@ export function ExportPanel({
     setStatus({ kind: 'working', done: 0 })
     try {
       const pdf = await exporter(pages, paper, quality, { onProgress: (done) => setStatus({ kind: 'working', done }) })
-      const name = pdfName(new Date())
-      const how = await hand(pdf, name)
-      setStatus(how === 'cancelled' ? { kind: 'idle' } : { kind: 'finished', how, name, size: pdf.size })
+      const file = pdfName(name ?? scanName(new Date()))
+      const how = await hand(pdf, file)
+      setStatus(how === 'cancelled' ? { kind: 'idle' } : { kind: 'finished', how, name: file, size: pdf.size })
     } catch {
       setStatus({ kind: 'failed' })
     }

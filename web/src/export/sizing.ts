@@ -29,7 +29,7 @@ export const PAPER: Record<Exclude<PaperSize, 'fit'>, { width: number; height: n
 export type Placement = { pageWidth: number; pageHeight: number; x: number; y: number; width: number; height: number }
 
 /**
- * Lays a w×h-pixel scan on a page. A4 and Letter turn to match the scan
+ * Lays a wÃh-pixel scan on a page. A4 and Letter turn to match the scan
  * (landscape scans get landscape paper) and the scan is scaled to fill the
  * page without stretching, centred. "Fit" makes the page the scan's own shape,
  * with its long side as long as A4's.
@@ -61,10 +61,20 @@ export function targetPixels(w: number, h: number, place: Placement, dpi: number
   return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) }
 }
 
-/** A file name like "Scan 2026-10-16 09.05.pdf", in local time. */
-export function pdfName(date: Date): string {
+/** A new scan's name, like "Scan 2026-10-16 09.05", in local time. */
+export function scanName(date: Date): string {
   const two = (n: number) => String(n).padStart(2, '0')
-  return `Scan ${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}.${two(date.getMinutes())}.pdf`
+  return `Scan ${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}.${two(date.getMinutes())}`
+}
+
+/** A PDF file name from a scan's name, without characters file systems reject. */
+export function pdfName(name: string): string {
+  const safe = name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-')
+    .replace(/^[\s.]+|[\s.]+$/g, '')
+    .slice(0, 100)
+  // Nothing left but punctuation: use a plain name.
+  return `${/[\p{L}\p{N}]/u.test(safe) ? safe : 'Scan'}.pdf`
 }
 
 export function formatBytes(bytes: number): string {
