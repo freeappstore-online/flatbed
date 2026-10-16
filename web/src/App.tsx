@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { initApp } from '@freeappstore/sdk'
 import { BuildInfo, type NavItem, PageHeader, Shell } from '@freeappstore/sdk/ui'
 import { Capture } from './capture/Capture'
-import { type Page, releasePages } from './capture/camera'
+import { type Page, releasePages, uncropped, unfiltered } from './capture/camera'
 import { CropEditor } from './crop/CropEditor'
+import { FilterEditor } from './filters/FilterEditor'
+import { FILTERS, type Filter } from './filters/filters'
+import { filterBlob } from './filters/render'
 
 const fas = initApp({ appId: 'flatbed' })
 
@@ -50,12 +53,17 @@ export default function App() {
   )
 }
 
+/** One edit waiting for a page. */
+type Step = { id: string; kind: 'crop' | 'filter' }
+
 function Scans() {
   const [capturing, setCapturing] = useState(false)
-  // This session's pages. Filters, export and saving come next (#238).
+  // This session's pages. Export and saving come next (#238).
   const [pages, setPages] = useState<Page[]>([])
-  // Pages waiting to be cropped, in order; new captures join the queue.
-  const [toCrop, setToCrop] = useState<string[]>([])
+  // Edits waiting their turn: each new page is cropped, then filtered.
+  const [steps, setSteps] = useState<Step[]>([])
+  // New pages start with the filter chosen last, so a run of pages is quick.
+  const [lastFilter, setLastFilter] = useState<Filter>('original')
   const held = useRef(pages)
   held.current = pages
   useEffect(() => () => releasePages(held.current), [])
@@ -63,12 +71,23 @@ function Scans() {
   const remove = (id: string) => {
     releasePages(pages.filter((p) => p.id === id))
     setPages(pages.filter((p) => p.id !== id))
-    setToCrop((q) => q.filter((x) => x !== id))
+    setSteps((q) => q.filter((s) => s.id !== id))
   }
 
-  const cropping = toCrop.map((id) => pages.find((p) => p.id === id)).find((p) => p !== undefined)
-  const croppingIndex = cropping ? pages.indexOf(cropping) : -1
-  const nextCrop = () => setToCrop((q) => q.filter((id) => id !== cropping?.id))
+  // The first waiting step whose page still exists.
+  const step = steps.find((s) => pages.some((p) => p.id === s.id))
+  const editing = step && pages.find((p) => p.id === step.id)!
+  const editingNumber = editing ? pages.indexOf(editing) + 1 : 0
+  const nextStep = () => setSteps((q) => q.filter((s) => s !== step))
+
+  // Swaps in a page's new image (and whatever else changed), freeing the old one.
+  const update = (id: string, blob: Blob, changes: Partial<Page>) => {
+    const url = URL.createObjectURL(blob)
+    releasePages(pages.filter((p) => p.id === id))
+    setPages((all) =>
+      all.map((p) => (p.id === id ? { ...p, original: p.original ?? p.blob, ...changes, blob, url } : p)),
+    )
+  }
 
   return (
     <>
@@ -94,10 +113,18 @@ function Scans() {
               <li key={page.id} className="rounded-[var(--radius)] border border-[var(--line)] p-2">
                 <img src={page.url} alt={`Page ${i + 1}`} className="aspect-[3/4] w-full rounded object-cover" />
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-[var(--muted)]">Page {i + 1}</span>
+                  <span className="text-[var(--muted)]">
+                    Page {i + 1}
+                    {page.filter && page.filter !== 'original' && (
+                      <span className="block text-xs">{FILTERS.find((f) => f.id === page.filter)?.name}</span>
+                    )}
+                  </span>
                   <span className="flex gap-3">
-                    <button type="button" onClick={() => setToCrop([page.id])} className="underline">
+                    <button type="button" onClick={() => setSteps([{ id: page.id, kind: 'crop' }])} className="underline">
                       Crop<span className="sr-only"> page {i + 1}</span>
+                    </button>
+                    <button type="button" onClick={() => setSteps([{ id: page.id, kind: 'filter' }])} className="underline">
+                      Filter<span className="sr-only"> page {i + 1}</span>
                     </button>
                     <button type="button" onClick={() => remove(page.id)} className="underline">
                       Remove<span className="sr-only"> page {i + 1}</span>
@@ -127,26 +154,39 @@ function Scans() {
           onCancel={() => setCapturing(false)}
           onDone={(added) => {
             setPages((all) => [...all, ...added])
-            setToCrop((q) => [...q, ...added.map((p) => p.id)])
+            setSteps((q) => [...q, ...added.flatMap((p): Step[] => [{ id: p.id, kind: 'crop' }, { id: p.id, kind: 'filter' }])])
             setCapturing(false)
           }}
         />
       )}
 
-      {cropping && (
+      {editing && step.kind === 'crop' && (
         <CropEditor
-          key={cropping.id}
-          blob={cropping.original ?? cropping.blob}
-          initial={cropping.crop}
-          title={`Crop page ${croppingIndex + 1}`}
-          onSkip={nextCrop}
-          onApply={(blob, crop) => {
-            const url = URL.createObjectURL(blob)
-            releasePages([cropping])
-            setPages((all) =>
-              all.map((p) => (p.id === cropping.id ? { ...p, original: p.original ?? p.blob, blob, url, crop } : p)),
-            )
-            nextCrop()
+          key={editing.id}
+          blob={uncropped(editing)}
+          initial={editing.crop}
+          title={`Crop page ${editingNumber}`}
+          onSkip={nextStep}
+          onApply={async (cropped, crop) => {
+            // A page that already has a filter gets it again on the new crop.
+            const blob = editing.filter ? await filterBlob(cropped, editing.filter).catch(() => cropped) : cropped
+            update(editing.id, blob, { cropped, crop })
+            nextStep()
+          }}
+        />
+      )}
+
+      {editing && step.kind === 'filter' && (
+        <FilterEditor
+          key={editing.id}
+          blob={unfiltered(editing)}
+          initial={editing.filter ?? lastFilter}
+          title={`Filter page ${editingNumber}`}
+          onSkip={nextStep}
+          onApply={(filter, blob) => {
+            update(editing.id, blob, { filter })
+            setLastFilter(filter)
+            nextStep()
           }}
         />
       )}
@@ -179,7 +219,7 @@ function About() {
 function ComingSoon() {
   return (
     <p className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-4 text-[var(--muted)]">
-      Flatbed is in development. Capture and cropping work today; filters, PDF export and saved scans are coming soon.
+      Flatbed is in development. Capture, cropping and filters work today; PDF export and saved scans are coming soon.
     </p>
   )
 }

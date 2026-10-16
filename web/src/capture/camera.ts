@@ -2,19 +2,28 @@
 // tested in Node; the browser APIs it needs are passed in.
 
 import type { Crop } from '../crop/perspective'
+import type { Filter } from '../filters/filters'
 
 /** One captured page. */
 export type Page = {
   id: string
-  /** The page as it is now: cropped and straightened once that's been done. */
+  /** The page as it is now: cropped, straightened and filtered as far as that's been done. */
   blob: Blob
   /** Object URL for showing the page; revoke it with releasePages. */
   url: string
   source: 'camera' | 'import'
-  /** The image as shot or imported, kept once cropped so the crop can be redone. */
+  /** The image as shot or imported, kept once edited so edits can be redone. */
   original?: Blob
   crop?: Crop
+  /** The cropped page before its filter. */
+  cropped?: Blob
+  filter?: Filter
 }
+
+/** What the crop editor starts from: the page as shot. */
+export const uncropped = (page: Page) => page.original ?? page.blob
+/** What the filter applies to: the cropped page, or the page as shot. */
+export const unfiltered = (page: Page) => page.cropped ?? page.original ?? page.blob
 
 /** Why the camera isn't showing a picture. */
 export type CameraProblem = 'unsupported' | 'blocked' | 'missing' | 'busy' | 'failed'
