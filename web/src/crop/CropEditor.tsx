@@ -3,6 +3,7 @@ import { DETECT_SIDE, detectQuad } from './edges'
 import { type Picture, drawPixels, encodeJpeg, openPicture } from './image'
 import { type Crop, type Point, type Quad, clampPoint, isConvex, rect, scaleQuad } from './perspective'
 import { type Pixels, warp } from './warp'
+import { FullScreen } from '../ui/FullScreen'
 
 const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left']
 const PREVIEW_SIDE = 240
@@ -174,7 +175,7 @@ export function CropEditor({
   const button = 'rounded-full bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+    <FullScreen label={title}>
       <div className="flex items-center justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <h2 className="font-semibold">{title}</h2>
         <button type="button" onClick={onSkip} disabled={working} className={button}>
@@ -296,6 +297,6 @@ export function CropEditor({
           </button>
         </div>
       </div>
-    </div>
+    </FullScreen>
   )
 }

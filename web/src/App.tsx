@@ -62,7 +62,7 @@ export default function App() {
 
   return (
     <Shell app={fas} appName="Flatbed" nav={NAV} onNavigate={(href) => navigate(href)}>
-      <div className="mx-auto w-full max-w-3xl p-4 sm:p-8">{screen}</div>
+      <div className="mx-auto w-full max-w-3xl p-4 sm:p-8 short:py-3">{screen}</div>
       <BuildInfo />
     </Shell>
   )

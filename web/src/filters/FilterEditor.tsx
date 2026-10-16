@@ -4,6 +4,7 @@ import type { Pixels } from '../crop/warp'
 import { FilterPicker } from './FilterPicker'
 import { FILTERS, type Filter, applyFilter } from './filters'
 import { filterBlob } from './render'
+import { FullScreen } from '../ui/FullScreen'
 
 const PREVIEW_SIDE = 1000
 const THUMB_SIDE = 120
@@ -94,7 +95,7 @@ export function FilterEditor({
   const button = 'rounded-full bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+    <FullScreen label={title}>
       <div className="flex items-center justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <h2 className="font-semibold">{title}</h2>
         <button type="button" onClick={onSkip} disabled={working} className={button}>
@@ -142,6 +143,6 @@ export function FilterEditor({
           </button>
         </div>
       </div>
-    </div>
+    </FullScreen>
   )
 }

@@ -19,13 +19,17 @@ const out = [
 ]
 const seen = new Set()
 
-/** The node_modules folder a package sits in (pnpm keeps a package's dependencies beside it). */
+/**
+ * The node_modules folder a package sits in (pnpm keeps a package's dependencies beside it).
+ * @param {string} dir
+ */
 function modulesDir(dir) {
   let d = dir
   while (path.basename(d) !== 'node_modules') d = path.dirname(d)
   return d
 }
 
+/** @param {string} dir */
 function add(dir) {
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
   if (seen.has(pkg.name)) return

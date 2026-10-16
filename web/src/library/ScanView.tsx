@@ -14,7 +14,8 @@ import type { Scan, ScanStore } from './store'
 type Step = { id: string; kind: 'crop' | 'filter' }
 
 const SAVE_FAILED = "Couldn't save that change. Your browser's storage for this site may be full."
-const link = 'underline disabled:no-underline disabled:opacity-40'
+// At least 24×24 px to tap (WCAG 2.2 target size).
+const link = 'inline-flex min-h-6 min-w-6 items-center justify-center underline disabled:no-underline disabled:opacity-40'
 
 /**
  * One saved scan: its pages (crop, filter, reorder, remove, add more), its

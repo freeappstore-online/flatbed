@@ -32,7 +32,7 @@ export function Library({
       <button
         type="button"
         onClick={() => setCapturing(true)}
-        className="w-full rounded-[var(--radius)] bg-[var(--ink)] px-4 py-4 text-lg font-semibold text-[var(--paper)] hover:opacity-90 sm:w-auto"
+        className="w-full rounded-[var(--radius)] bg-[var(--ink)] px-4 py-4 text-lg font-semibold text-[var(--paper)] hover:opacity-90 sm:w-auto short:py-2.5 short:text-base"
       >
         New scan
       </button>
@@ -42,7 +42,7 @@ export function Library({
         </p>
       )}
 
-      <section className="mt-6" aria-labelledby="scans-heading">
+      <section className="mt-6 short:mt-3" aria-labelledby="scans-heading">
         <h2 id="scans-heading" className="font-semibold text-[var(--ink)]">
           Your scans
         </h2>
@@ -61,7 +61,7 @@ export function Library({
         )}
       </section>
 
-      <p className="mt-6 text-sm text-[var(--muted)]">
+      <p className="mt-6 text-sm text-[var(--muted)] short:mt-3">
         Scans are kept only in this browser on this device.{' '}
         <button type="button" onClick={onPrivacy} className="underline">
           Privacy

@@ -10,7 +10,10 @@ see freeappstore-online/platform#238.
 - Dev: `pnpm install && pnpm dev`
 - Build: `pnpm build`
 - Test: `pnpm test` (vitest; component tests use jsdom)
-- Check: `fas check`
+- E2E: `pnpm test:e2e` (Playwright on the production build; `web/e2e/fake-camera.ts` feeds a drawn
+  page into getUserMedia; axe checks every screen in light and dark)
+- Check: `fas check` and `fas screencheck` (on Windows run `pnpm build && fas screencheck
+  --skip-build`: its own build step can't spawn pnpm there)
 - Deploy: `git push origin main` (auto-deploys to R2 via GitHub Actions)
 
 ## Notes
@@ -19,6 +22,8 @@ see freeappstore-online/platform#238.
   beyond the platform API and analytics loader. Keep it that way.
 - Images and PDFs never leave the device: no uploads, no server-side processing. The privacy
   note (`web/src/Privacy.tsx`, on About) says so and discloses the platform analytics; keep it true.
+- Camera, crop and filter screens are always dark (`web/src/ui/FullScreen.tsx`: a portal that makes
+  the rest of the page inert and returns focus on close); the rest follows the Shell's theme toggle.
 - Analytics record the screen path, so scan ids and names stay out of URLs and titles (`/scan`,
   with the id in history state).
 - Edge detection, perspective correction, rotation and filters are our own code.
@@ -29,6 +34,7 @@ see freeappstore-online/platform#238.
     @pdf-lib/standard-fonts 1.0.0 MIT, @pdf-lib/upng 1.0.1 MIT, pako 1.0.11 MIT AND Zlib,
     tslib 1.14.1 0BSD.
   - idb 8.0.4, ISC (saved scans in IndexedDB).
-  - Test-only, not shipped: fake-indexeddb 6.2.5, Apache-2.0.
+  - Test-only, not shipped: fake-indexeddb 6.2.5 Apache-2.0, @playwright/test and playwright
+    1.64.1 Apache-2.0, @axe-core/playwright 4.14.0 MPL-2.0.
 
 Platform conventions: https://raw.githubusercontent.com/freeappstore-online/freeappstore/main/SKILLS.md

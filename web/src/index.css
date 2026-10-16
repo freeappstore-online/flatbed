@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Phones held sideways: tighter spacing so screens fit without scrolling. */
+@custom-variant short (@media (max-height: 480px));
+
 /* Brand fonts, self-hosted from @fontsource-variable so the app makes no
    third-party requests (latin + latin-ext subsets). */
 @font-face {
@@ -232,3 +235,30 @@ a:focus-visible {
 /* Shell's text-size preference scales rem-based app typography. */
 :root[data-text='lg'] { font-size: 112.5%; }
 :root[data-text='sm'] { font-size: 87.5%; }
+
+/* The SDK's Sign in button is white on --accent (3.3:1 light, 2.1:1 dark),
+   below WCAG AA for its 14px text. Use the deep accent with paper text instead
+   (white on #9f4427, near-black on #ffd9cb). Its colours are inline styles,
+   hence !important. */
+header button[style*='--accent'] {
+  background: var(--accent-deep) !important;
+  color: var(--paper) !important;
+  white-space: nowrap;
+}
+
+/* With Sign in kept on one line, the Shell header (Free · Flatbed · menu ·
+   text size · theme · Sign in) is ~14px too wide for a 320px phone. Below
+   360px, tighten its spacing; layout only, no brand colours. Its styles are
+   inline, hence !important. */
+@media (max-width: 359px) {
+  #root header {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  #root header > div:first-child {
+    gap: 0.5rem !important;
+  }
+  #root header > div:last-child {
+    gap: 0.25rem !important;
+  }
+}

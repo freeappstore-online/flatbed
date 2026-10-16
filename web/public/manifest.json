@@ -1,13 +1,20 @@
 {
+  "id": "/",
   "name": "Flatbed",
   "short_name": "Flatbed",
   "description": "Scan documents to PDF on your device: auto-crop, filters and multi-page export. Nothing leaves your phone.",
+  "lang": "en",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "min_viewport_width": 320,
   "background_color": "#ffffff",
   "theme_color": "#111111",
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

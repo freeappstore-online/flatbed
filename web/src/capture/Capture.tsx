@@ -9,6 +9,7 @@ import {
   releasePages,
   stopCamera,
 } from './camera'
+import { FullScreen } from '../ui/FullScreen'
 
 type Camera = { kind: 'starting' } | { kind: 'live' } | { kind: 'problem'; problem: CameraProblem }
 
@@ -82,18 +83,13 @@ export function Capture({
     // mediaDevices is fixed for the life of the screen; attempt re-runs this for "Try again".
   }, [attempt])
 
-  // Escape leaves; the page behind doesn't scroll while capture is open.
+  // Escape leaves.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') cancel()
     }
     document.addEventListener('keydown', onKey)
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
-    }
+    return () => document.removeEventListener('keydown', onKey)
   })
 
   // Free any pages still here if the screen goes away without Done.
@@ -164,12 +160,7 @@ export function Capture({
   const count = pages.length
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Capture pages"
-      className="fixed inset-0 z-50 flex flex-col bg-black text-white"
-    >
+    <FullScreen label="Capture pages">
       <div className="flex items-center justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" onClick={cancel} className="rounded-full bg-white/15 px-4 py-2 text-sm font-semibold">
           {confirmDiscard ? `Discard ${count} ${count === 1 ? 'page' : 'pages'}?` : 'Cancel'}
@@ -301,6 +292,6 @@ export function Capture({
         onChange={imported}
         data-testid="import-input"
       />
-    </div>
+    </FullScreen>
   )
 }
