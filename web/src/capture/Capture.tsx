@@ -10,6 +10,7 @@ import {
   stopCamera,
 } from './camera'
 import { FullScreen } from '../ui/FullScreen'
+import { DETECT_SIDE, detectQuad } from '../crop/edges'
 
 type Camera = { kind: 'starting' } | { kind: 'live' } | { kind: 'problem'; problem: CameraProblem }
 
@@ -49,6 +50,9 @@ export function Capture({
   const [flash, setFlash] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const video = useRef<HTMLVideoElement>(null)
+  const overlay = useRef<HTMLCanvasElement>(null)
+  const stopDetection = useRef<() => void>(() => {})
+  const [detectionRun, setDetectionRun] = useState(0)
   const picker = useRef<HTMLInputElement>(null)
   const shutter = useRef<HTMLButtonElement>(null)
   const shooting = useRef(false)
@@ -83,6 +87,66 @@ export function Capture({
     // mediaDevices is fixed for the life of the screen; attempt re-runs this for "Try again".
   }, [attempt])
 
+  useEffect(() => {
+    const v = video.current
+    const canvas = overlay.current
+    if (camera.kind !== 'live' || !v || !canvas) return
+    const sample = document.createElement('canvas')
+    let context: CanvasRenderingContext2D | null = null
+    let input: CanvasRenderingContext2D | null = null
+    const tick = () => {
+      const width = v.clientWidth
+      const height = v.clientHeight
+      if (canvas.width !== width) canvas.width = width
+      if (canvas.height !== height) canvas.height = height
+      if (!width || !height) return
+      context ??= canvas.getContext('2d')
+      if (!context) return
+      context.clearRect(0, 0, width, height)
+      if (v.readyState < 2 || !v.videoWidth || !v.videoHeight || shooting.current || document.hidden) return
+      input ??= sample.getContext('2d', { willReadFrequently: true })
+      if (!input) return
+      const ratio = DETECT_SIDE / Math.max(v.videoWidth, v.videoHeight)
+      const sw = Math.max(1, Math.round(v.videoWidth * ratio))
+      const sh = Math.max(1, Math.round(v.videoHeight * ratio))
+      if (sample.width !== sw) sample.width = sw
+      if (sample.height !== sh) sample.height = sh
+      try {
+        input.drawImage(v, 0, 0, sw, sh)
+        const quad = detectQuad(input.getImageData(0, 0, sw, sh))
+        if (!quad) return
+        // object-contain centers the image inside the video's element box.
+        const fit = Math.min(width / v.videoWidth, height / v.videoHeight)
+        const imageWidth = v.videoWidth * fit
+        const imageHeight = v.videoHeight * fit
+        const points = quad.map((p) => ({
+          x: (width - imageWidth) / 2 + p.x * imageWidth / sw,
+          y: (height - imageHeight) / 2 + p.y * imageHeight / sh,
+        }))
+        context.beginPath()
+        points.forEach((p, i) => i === 0 ? context!.moveTo(p.x, p.y) : context!.lineTo(p.x, p.y))
+        context.closePath()
+        context.fillStyle = 'rgba(0,200,100,0.25)'
+        context.fill()
+        context.strokeStyle = 'rgba(0,200,100,0.85)'
+        context.lineWidth = 3
+        context.stroke()
+        context.fillStyle = 'rgba(0,200,100,0.85)'
+        points.forEach((p) => context!.fillRect(p.x - 4, p.y - 4, 8, 8))
+      } catch {
+        // A camera frame can become unavailable while the stream changes.
+        context.clearRect(0, 0, width, height)
+      }
+    }
+    const timer = window.setInterval(tick, 100)
+    const stop = () => {
+      window.clearInterval(timer)
+      context?.clearRect(0, 0, canvas.width, canvas.height)
+    }
+    stopDetection.current = stop
+    return stop
+  }, [camera.kind, detectionRun])
+
   // Escape leaves.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -100,6 +164,7 @@ export function Capture({
   }, [camera.kind])
 
   const finish = (all: Page[]) => {
+    stopDetection.current()
     held.current = []
     setPages([])
     onDone(all)
@@ -111,6 +176,7 @@ export function Capture({
       return
     }
     releasePages(pages)
+    stopDetection.current()
     held.current = []
     setPages([])
     onCancel()
@@ -120,6 +186,8 @@ export function Capture({
     const v = video.current
     if (camera.kind !== 'live' || !v || shooting.current) return
     shooting.current = true
+    stopDetection.current()
+    let resume = true
     try {
       const blob = await snap(v)
       if (!blob) return setNotice('The camera is still starting. Try again in a moment.')
@@ -130,9 +198,13 @@ export function Capture({
       setConfirmDiscard(false)
       const page = newPage(blob, 'camera')
       if (multi) setPages((all) => [...all, page])
-      else finish([page])
+      else {
+        resume = false
+        finish([page])
+      }
     } finally {
       shooting.current = false
+      if (resume) setDetectionRun((run) => run + 1)
     }
   }
 
@@ -183,6 +255,11 @@ export function Capture({
               muted
               autoPlay
               aria-label="Camera viewfinder"
+            />
+            <canvas
+              ref={overlay}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full"
             />
             {camera.kind === 'starting' && (
               <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-white/80">Starting the camera…</p>
