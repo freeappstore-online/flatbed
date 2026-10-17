@@ -43,6 +43,7 @@ export function ScanView({
   // New pages start with the filter chosen last, so a run of pages is quick.
   const [lastFilter, setLastFilter] = useState<Filter>('original')
   const [capturing, setCapturing] = useState(false)
+  const [retaking, setRetaking] = useState<string | null>(null)
   const [error, setError] = useState('')
   const held = useRef(pages)
   held.current = pages
@@ -178,6 +179,9 @@ export function ScanView({
                 <button type="button" onClick={() => remove(page.id)} className={link} aria-label={`Remove page ${i + 1}`}>
                   Remove
                 </button>
+                <button type="button" onClick={() => setRetaking(page.id)} className={link} aria-label={`Retake page ${i + 1}`}>
+                  Retake
+                </button>
               </div>
             </li>
           ))}
@@ -196,6 +200,27 @@ export function ScanView({
             setPages((all) => [...all, ...added])
             setSteps((q) => [...q, ...added.map((p) => p.id).flatMap(newSteps)])
             save(() => store.addPages(scanId, added.map(toInput)))
+          }}
+        />
+      )}
+
+      {retaking && (
+        <Capture
+          singlePage
+          onCancel={() => setRetaking(null)}
+          onDone={async (captured) => {
+            const id = retaking
+            setRetaking(null)
+            const [replacement, ...unused] = captured
+            releasePages(unused)
+            if (!replacement) return
+            // Keep the saved identity and order, but discard all old image/edit data.
+            const page = { ...replacement, id }
+            if (await save(() => store.updatePage(scanId, toInput(page)))) {
+              releasePages(held.current.filter((p) => p.id === id))
+              setPages((all) => all.map((p) => p.id === id ? page : p))
+              setSteps(newSteps(id))
+            } else releasePages([page])
           }}
         />
       )}

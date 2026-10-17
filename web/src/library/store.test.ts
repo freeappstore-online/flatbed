@@ -109,6 +109,23 @@ describe('reorder', () => {
 })
 
 describe('pages', () => {
+  it('replaces a captured page in place, discards old edits, and persists after reopening', async () => {
+    const store = makeStore()
+    const { id } = await store.createScan('Doc', [page('a'), page('b', {
+      original: new Blob(['old original']), cropped: new Blob(['old crop']), filter: 'bw', source: 'import',
+    }), page('c')])
+    await store.updatePage(id, page('b', { blob: new Blob(['new capture']) }))
+    await store.close()
+    const pages = await store.getPages(id)
+    expect(pages.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    expect(await Promise.all(pages.map((p) => text(p.blob)))).toEqual(['a', 'new capture', 'c'])
+    expect(pages[1]).toMatchObject({ source: 'camera', scanId: id })
+    expect(pages[1].original).toBeUndefined()
+    expect(pages[1].cropped).toBeUndefined()
+    expect(pages[1].filter).toBeUndefined()
+    expect(pages[1].crop).toBeUndefined()
+  })
+
   it('adds pages to the end', async () => {
     const store = makeStore()
     const { id } = await store.createScan('Doc', [page('a')])

@@ -167,6 +167,43 @@ for (const colorScheme of ['light', 'dark'] as const) {
       }
       await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
 
+      // Retake just the middle page. Cancellation preserves every image.
+      const savedPages = () => page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('flatbed')
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        const rows = await new Promise<{ id: string; blob: Blob; filter?: string }[]>((resolve, reject) => {
+          const request = db.transaction('pages').objectStore('pages').getAll()
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        db.close()
+        return Promise.all(rows.map(async (row) => ({
+          id: row.id, filter: row.filter,
+          bytes: Array.from(new Uint8Array(await row.blob.arrayBuffer())),
+        })))
+      })
+      const beforeRetake = await savedPages()
+      await page.getByRole('button', { name: 'Retake page 2', exact: true }).click()
+      await camera.getByRole('button', { name: 'Cancel', exact: true }).click()
+      expect(await savedPages()).toEqual(beforeRetake)
+      await page.getByRole('button', { name: 'Retake page 2', exact: true }).click()
+      await expect(camera.getByRole('button', { name: 'Multi-page', exact: true })).toHaveCount(0)
+      await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
+      await camera.getByRole('button', { name: 'Take photo' }).click()
+      await dialog(page, 'Crop page 2').getByRole('button', { name: 'Done' }).click()
+      await dialog(page, 'Filter page 2').getByRole('button', { name: 'Greyscale', exact: true }).click()
+      await dialog(page, 'Filter page 2').getByRole('button', { name: 'Done' }).click()
+      await expect.poll(async () => (await savedPages()).filter((p) => p.filter === 'greyscale').length).toBe(1)
+      const afterRetake = await savedPages()
+      expect(afterRetake.map((p) => p.id)).toEqual(beforeRetake.map((p) => p.id))
+      expect(afterRetake.filter((p) => p.filter !== 'greyscale')).toEqual(beforeRetake.filter((p) => p.id !== afterRetake.find((p) => p.filter === 'greyscale')!.id))
+      await page.reload()
+      expect(await savedPages()).toEqual(afterRetake)
+      await expect(page.getByText('Page 2 · Greyscale')).toBeVisible()
+
       // Reorder: page 1 moves to the end.
       const srcs = () => page.getByRole('img', { name: /^Page \d$/ }).evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src))
       const [first, second, third] = await srcs()

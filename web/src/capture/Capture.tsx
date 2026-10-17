@@ -32,11 +32,14 @@ const PROBLEM_TEXT: Record<CameraProblem, string> = {
 export function Capture({
   onDone,
   onCancel,
+  singlePage = false,
   media,
   snap = (video) => grabFrame(video),
 }: {
   onDone: (pages: Page[]) => void
   onCancel: () => void
+  /** Restrict capture and import to one replacement page. */
+  singlePage?: boolean
   /** For tests; defaults to navigator.mediaDevices. */
   media?: { getUserMedia?: (c: MediaStreamConstraints) => Promise<MediaStream> }
   /** For tests; defaults to grabbing a frame from the video. */
@@ -209,7 +212,8 @@ export function Capture({
   }
 
   const imported = (e: ChangeEvent<HTMLInputElement>) => {
-    const { pages: added, skipped } = importFiles(e.target.files ?? [])
+    const files = Array.from(e.target.files ?? [])
+    const { pages: added, skipped } = importFiles(singlePage ? files.slice(0, 1) : files)
     e.target.value = ''
     setConfirmDiscard(false)
     setNotice(
@@ -318,7 +322,7 @@ export function Capture({
       )}
 
       <div className="flex flex-col gap-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto flex rounded-full bg-white/15 p-1 text-sm font-semibold" role="group" aria-label="Pages">
+        {!singlePage && <div className="mx-auto flex rounded-full bg-white/15 p-1 text-sm font-semibold" role="group" aria-label="Pages">
           {[false, true].map((m) => (
             <button
               key={String(m)}
@@ -330,7 +334,7 @@ export function Capture({
               {m ? 'Multi-page' : 'Single page'}
             </button>
           ))}
-        </div>
+        </div>}
         <div className="grid grid-cols-3 items-center">
           <button
             type="button"
@@ -364,7 +368,7 @@ export function Capture({
         ref={picker}
         type="file"
         accept="image/*"
-        multiple
+        multiple={!singlePage}
         hidden
         onChange={imported}
         data-testid="import-input"
