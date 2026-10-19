@@ -20,7 +20,8 @@
     "build": "pnpm --filter @flatbed/web build",
     "preview": "pnpm --filter @flatbed/web preview",
     "typecheck": "pnpm --filter @flatbed/web exec tsc -b",
-    "test": "pnpm --filter @flatbed/web test",
+    "test": "pnpm check:tracking && pnpm --filter @flatbed/web test",
+    "check:tracking": "node --test scripts/check-tracking.test.mjs && node scripts/check-tracking.mjs",
     "test:e2e": "pnpm --filter @flatbed/web test:e2e"
   },
   "devDependencies": {

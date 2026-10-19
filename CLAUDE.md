@@ -10,6 +10,8 @@ see freeappstore-online/platform#238.
 - Dev: `pnpm install && pnpm dev`
 - Build: `pnpm build`
 - Test: `pnpm test` (vitest; component tests use jsdom)
+- Tracking guard: `pnpm check:tracking` (also runs in tests and compliance CI). Issue #4
+  permits the exact FreeAppStore cookieless loader; third-party trackers remain prohibited.
 - E2E: `pnpm test:e2e` (Playwright on the production build; `web/e2e/fake-camera.ts` feeds a drawn
   page into getUserMedia; every journey in light and dark at Pixel 7 size, axe on every screen).
   `E2E_BASE_URL=https://flatbed.freeappstore.online pnpm test:e2e` runs them on the live site.

@@ -32,10 +32,7 @@ jobs:
         run: test ! -f .env.production && test ! -f web/.env.production
 
       - name: No tracking
-        run: |
-          FORBIDDEN="google-analytics|gtag|amplitude|mixpanel|segment|hotjar|plausible|posthog"
-          ! grep -rE "$FORBIDDEN" web/src/ 2>/dev/null
-          ! grep -E "$FORBIDDEN" web/package.json 2>/dev/null
+        run: pnpm check:tracking
 
       - name: Brand fonts
         run: |
