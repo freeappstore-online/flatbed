@@ -39,6 +39,40 @@ async function openScan(
 }
 
 describe('Library', () => {
+  it('offers a recovered draft to resume or discard after reopening', async () => {
+    const store = makeStore()
+    await store.saveDraft({ kind: 'new', pages: [page('a'), page('b')] })
+    const view = render(<Library store={store} onOpen={() => {}} onPrivacy={() => {}} />)
+    expect((await screen.findByRole('region', { name: 'Unfinished scan' })).textContent).toMatch(/2 pages were saved on this device/)
+    expect(btn('New scan').disabled).toBe(true)
+    fireEvent.click(btn('Resume'))
+    expect(await screen.findByRole('heading', { name: 'Review 2 pages' })).toBeTruthy()
+    view.unmount()
+    render(<Library store={store} onOpen={() => {}} onPrivacy={() => {}} />)
+    expect(await screen.findByRole('region', { name: 'Unfinished scan' })).toBeTruthy()
+    fireEvent.click(btn('Discard'))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Unfinished scan' })).toBeNull())
+    expect(await store.getDraft()).toBeUndefined()
+  })
+
+  it('warns during capture when the draft cannot be saved', async () => {
+    const store = makeStore()
+    vi.spyOn(store, 'saveDraft').mockRejectedValue(new Error('QuotaExceededError'))
+    render(<Library store={store} onOpen={() => {}} onPrivacy={() => {}} />)
+    await waitFor(() => expect(btn('New scan').disabled).toBe(false))
+    fireEvent.click(btn('New scan'))
+    fireEvent.change(screen.getByTestId('import-input'), { target: { files: [new File(['photo'], 'page.jpg', { type: 'image/jpeg' })] } })
+    expect((await screen.findByText(/Couldn't back up these pages/)).getAttribute('role')).toBe('alert')
+  })
+
+  it('keeps capture available if checking for a draft fails', async () => {
+    const store = makeStore()
+    vi.spyOn(store, 'getDraft').mockRejectedValue(new Error('IndexedDB unavailable'))
+    render(<Library store={store} onOpen={() => {}} onPrivacy={() => {}} />)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn't check for an unfinished scan/)
+    expect(btn('New scan').disabled).toBe(false)
+  })
+
   it('lists saved scans newest first with their page counts', async () => {
     const store = makeStore()
     await store.createScan('Older', [page('a')])

@@ -9,7 +9,7 @@ import type { Filter } from '../filters/filters'
 import type { Adjustments } from '../filters/adjustments'
 
 export const DB_NAME = 'flatbed'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 /** A saved scan: its name and the order of its pages. */
 export type Scan = {
@@ -38,12 +38,22 @@ export type StoredPage = {
 /** A page as the editor holds it; the store adds the scan id. */
 export type PageInput = Omit<StoredPage, 'scanId'>
 
+/** The one unfinished batch on this device. Images stay in IndexedDB. */
+export type ScanDraft = {
+  id: 'active'
+  kind: 'new' | 'append'
+  scanId?: string
+  pages: PageInput[]
+  updatedAt: number
+}
+
 /** A scan for the list: its first page for a thumbnail. */
 export type ScanSummary = Scan & { cover?: Blob }
 
 interface FlatbedDB extends DBSchema {
   scans: { key: string; value: Scan; indexes: { updatedAt: number } }
   pages: { key: string; value: StoredPage; indexes: { scanId: string } }
+  drafts: { key: string; value: ScanDraft }
 }
 
 export interface ScanStore {
@@ -52,10 +62,13 @@ export interface ScanStore {
   getScan(id: string): Promise<Scan | undefined>
   /** A scan's pages, in order. */
   getPages(scanId: string): Promise<StoredPage[]>
-  createScan(name: string, pages: PageInput[]): Promise<Scan>
+  createScan(name: string, pages: PageInput[], finishDraft?: boolean): Promise<Scan>
   renameScan(id: string, name: string): Promise<Scan>
   /** Adds pages to the end of a scan. */
-  addPages(scanId: string, pages: PageInput[]): Promise<Scan>
+  addPages(scanId: string, pages: PageInput[], finishDraft?: boolean): Promise<Scan>
+  getDraft(): Promise<ScanDraft | undefined>
+  saveDraft(draft: Omit<ScanDraft, 'id' | 'updatedAt'>): Promise<void>
+  discardDraft(): Promise<void>
   /** Saves a page's new image and edits. */
   updatePage(scanId: string, page: PageInput): Promise<void>
   /** Moves the page at `from` by `by` places (-1 earlier, +1 later), clamped to the ends. */
@@ -94,24 +107,38 @@ export function createScanStore({
 } = {}): ScanStore {
   let db: Promise<IDBPDatabase<FlatbedDB>> | undefined
   let askedPersist = false
+  let draftWrite: Promise<void> = Promise.resolve()
   const listeners = new Set<() => void>()
 
   const open = () =>
     (db ??= openDB<FlatbedDB>(dbName, DB_VERSION, {
-      upgrade(d) {
-        d.createObjectStore('scans', { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt')
-        d.createObjectStore('pages', { keyPath: 'id' }).createIndex('scanId', 'scanId')
+      upgrade(d, oldVersion) {
+        if (oldVersion < 1) {
+          d.createObjectStore('scans', { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt')
+          d.createObjectStore('pages', { keyPath: 'id' }).createIndex('scanId', 'scanId')
+        }
+        if (oldVersion < 2) d.createObjectStore('drafts', { keyPath: 'id' })
       },
     }))
 
   const changed = () => listeners.forEach((l) => l())
 
+  // Serialize writes so a slow image clone cannot restore an older draft after
+  // a newer edit, discard, or final save.
+  const queueDraft = (write: () => Promise<void>) => {
+    const pending = draftWrite.catch(() => {}).then(write)
+    draftWrite = pending.catch(() => {})
+    return pending
+  }
+
   /** Runs `edit` on a scan inside one read-write transaction over both stores, then saves it. */
   async function editScan(
     id: string,
     edit: (scan: Scan, pages: IDBPObjectStoreLike) => Promise<Partial<Scan> | void> | Partial<Scan> | void,
+    finishDraft = false,
   ): Promise<Scan> {
-    const tx = (await open()).transaction(['scans', 'pages'], 'readwrite')
+    if (finishDraft) await draftWrite
+    const tx = (await open()).transaction(finishDraft ? ['scans', 'pages', 'drafts'] : ['scans', 'pages'], 'readwrite')
     const scan = await tx.objectStore('scans').get(id)
     if (!scan) {
       tx.abort()
@@ -128,12 +155,37 @@ export function createScanStore({
     }
     const saved = { ...scan, ...changes, updatedAt: now() }
     await tx.objectStore('scans').put(saved)
+    if (finishDraft) await tx.objectStore('drafts').delete('active')
     await tx.done
     changed()
     return saved
   }
 
   return {
+    async getDraft() {
+      await draftWrite
+      return (await open()).get('drafts', 'active')
+    },
+
+    saveDraft(draft) {
+      return queueDraft(async () => {
+        const tx = (await open()).transaction('drafts', 'readwrite')
+        if (draft.pages.length) await tx.store.put({ ...draft, id: 'active', updatedAt: now() })
+        else await tx.store.delete('active')
+        await tx.done
+        changed()
+      })
+    },
+
+    discardDraft() {
+      return queueDraft(async () => {
+        const tx = (await open()).transaction('drafts', 'readwrite')
+        await tx.store.delete('active')
+        await tx.done
+        changed()
+      })
+    },
+
     async listScans() {
       const d = await open()
       const scans = (await d.getAllFromIndex('scans', 'updatedAt')).reverse()
@@ -155,13 +207,15 @@ export function createScanStore({
       return scan.pages.map((id) => byId.get(id)).filter((p): p is StoredPage => p !== undefined)
     },
 
-    async createScan(name, pages) {
+    async createScan(name, pages, finishDraft = false) {
+      if (finishDraft) await draftWrite
       const t = now()
       const scan: Scan = { id: newId(), name: cleanName(name), pages: pages.map((p) => p.id), createdAt: t, updatedAt: t }
-      const tx = (await open()).transaction(['scans', 'pages'], 'readwrite')
+      const tx = (await open()).transaction(finishDraft ? ['scans', 'pages', 'drafts'] : ['scans', 'pages'], 'readwrite')
       await Promise.all([
         tx.objectStore('scans').add(scan),
         ...pages.map((p) => tx.objectStore('pages').put({ ...p, scanId: scan.id })),
+        ...(finishDraft ? [tx.objectStore('drafts').delete('active')] : []),
         tx.done,
       ])
       changed()
@@ -176,11 +230,11 @@ export function createScanStore({
       return editScan(id, () => ({ name: cleanName(name) }))
     },
 
-    addPages(scanId, pages) {
+    addPages(scanId, pages, finishDraft = false) {
       return editScan(scanId, async (scan, store) => {
         for (const p of pages) await store.put({ ...p, scanId })
         return { pages: [...scan.pages, ...pages.map((p) => p.id)] }
-      })
+      }, finishDraft)
     },
 
     async updatePage(scanId, page) {

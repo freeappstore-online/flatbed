@@ -26,6 +26,65 @@ async function expectAccessible(page: Page, where: string) {
 
 const dialog = (page: Page, name: string | RegExp) => page.getByRole('dialog', { name })
 
+async function draftCount(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('flatbed')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const count = await new Promise<number>((resolve, reject) => {
+      const request = db.transaction('drafts').objectStore('drafts').get('active')
+      request.onsuccess = () => resolve(request.result?.pages.length ?? 0)
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+    return count
+  })
+}
+
+test('recovers an interrupted capture and clears its draft on save or discard', async ({ page }) => {
+  await useFakeCamera(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New scan' }).click()
+  const camera = dialog(page, 'Capture pages')
+  await camera.getByRole('button', { name: 'Auto capture on' }).click()
+  await camera.getByRole('button', { name: 'Take photo' }).click()
+  await expect(camera.getByRole('img', { name: 'Page 1' })).toBeVisible()
+  await expect.poll(() => draftCount(page)).toBe(1)
+  await page.reload()
+  const recovery = page.getByRole('region', { name: 'Unfinished scan' })
+  await expect(recovery).toContainText('1 page was saved on this device')
+  await expect(page.getByRole('button', { name: 'New scan' })).toBeDisabled()
+  await recovery.getByRole('button', { name: 'Resume' }).click()
+  const review = dialog(page, 'Review pages')
+  await expect(review.getByRole('img', { name: 'Page 1' })).toBeVisible()
+  await review.getByRole('button', { name: 'Save scan' }).click()
+  await expect(page.getByRole('heading', { name: '1 page' })).toBeVisible()
+  await expect.poll(() => draftCount(page)).toBe(0)
+  await page.getByRole('button', { name: 'Add pages' }).click()
+  await dialog(page, 'Capture pages').getByTestId('import-input').setInputFiles(await pagePhoto(page))
+  await expect.poll(() => draftCount(page)).toBe(1)
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Unfinished scan' })).toContainText('Resume adding these pages')
+  await page.getByRole('region', { name: 'Unfinished scan' }).getByRole('button', { name: 'Resume' }).click()
+  await dialog(page, 'Review pages').getByRole('button', { name: 'Add to scan' }).click()
+  await expect(page.getByRole('heading', { name: '2 pages' })).toBeVisible()
+  await expect.poll(() => draftCount(page)).toBe(0)
+  await page.goto('/')
+  await expect(page.getByRole('region', { name: 'Unfinished scan' })).toHaveCount(0)
+  await expect(page.getByRole('listitem')).toHaveCount(1)
+
+  await page.getByRole('button', { name: 'New scan' }).click()
+  await dialog(page, 'Capture pages').getByTestId('import-input').setInputFiles(await pagePhoto(page))
+  await expect.poll(() => draftCount(page)).toBe(1)
+  await page.reload()
+  await page.getByRole('region', { name: 'Unfinished scan' }).getByRole('button', { name: 'Discard' }).click()
+  await expect(page.getByRole('region', { name: 'Unfinished scan' })).toHaveCount(0)
+  await expect.poll(() => draftCount(page)).toBe(0)
+  await expect(page.getByRole('listitem')).toHaveCount(1)
+})
+
 /** Opens the camera from the home screen and takes one photo (single-page mode). */
 async function shootOnePage(page: Page) {
   await page.getByRole('button', { name: 'New scan' }).click()

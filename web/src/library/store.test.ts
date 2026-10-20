@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { openDB } from 'idb'
 import { NotFoundError, type PageInput, type ScanStore, cleanName, createScanStore } from './store'
 
 let n = 0
@@ -202,5 +203,72 @@ describe('persistence', () => {
     expect(await ids(b, id)).toEqual(['a'])
     expect((await b.getPages(id))[0].adjustments).toEqual({ brightness: 25, contrast: -10 })
     expect(await text((await b.getPages(id))[0].original)).toBe('raw')
+  })
+})
+
+describe('unfinished drafts', () => {
+  it('recovers image blobs and edits after a fresh store opens the same database', async () => {
+    const dbName = `test-${++n}`
+    const first = createScanStore({ dbName })
+    const image = page('a', { source: 'import', original: new Blob(['raw']), filter: 'bw' })
+    await first.saveDraft({ kind: 'new', pages: [image] })
+    await first.close()
+    const reopened = createScanStore({ dbName })
+    open.push(reopened)
+    const draft = await reopened.getDraft()
+    expect(draft).toMatchObject({ kind: 'new', pages: [{ id: 'a', source: 'import', filter: 'bw' }] })
+    expect(await text(draft?.pages[0].blob)).toBe('a')
+    expect(await text(draft?.pages[0].original)).toBe('raw')
+  })
+
+  it('upgrades an existing version-one database without losing saved scans', async () => {
+    const dbName = `test-${++n}`
+    const old = await openDB(dbName, 1, { upgrade(db) {
+      db.createObjectStore('scans', { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt')
+      db.createObjectStore('pages', { keyPath: 'id' }).createIndex('scanId', 'scanId')
+    } })
+    await old.put('scans', { id: 'old', name: 'Earlier', pages: [], createdAt: 1, updatedAt: 1 })
+    old.close()
+    const store = createScanStore({ dbName })
+    open.push(store)
+    expect((await store.getScan('old'))?.name).toBe('Earlier')
+    await store.saveDraft({ kind: 'new', pages: [page('new')] })
+    expect((await store.getDraft())?.pages.map((p) => p.id)).toEqual(['new'])
+  })
+
+  it('discards blobs and atomically clears a draft when a new scan is saved', async () => {
+    const store = makeStore()
+    await store.saveDraft({ kind: 'new', pages: [page('a')] })
+    const saved = await store.createScan('Recovered', [page('a')], true)
+    expect((await store.listScans()).map((s) => s.id)).toEqual([saved.id])
+    expect(await store.getDraft()).toBeUndefined()
+    await store.saveDraft({ kind: 'new', pages: [page('b')] })
+    await store.discardDraft()
+    expect(await store.getDraft()).toBeUndefined()
+    expect(await ids(store, saved.id)).toEqual(['a'])
+  })
+
+  it('atomically clears an append draft without adding its pages twice', async () => {
+    const store = makeStore()
+    const saved = await store.createScan('Doc', [page('a')])
+    await store.saveDraft({ kind: 'append', scanId: saved.id, pages: [page('b')] })
+    await store.addPages(saved.id, [page('b')], true)
+    expect(await ids(store, saved.id)).toEqual(['a', 'b'])
+    expect(await store.getDraft()).toBeUndefined()
+  })
+
+  it('reports a failed draft write, keeps the previous draft, and accepts the next write', async () => {
+    let fail = false
+    const store = createScanStore({ dbName: `test-${++n}`, now: () => {
+      if (fail) { fail = false; throw new Error('QuotaExceededError') }
+      return Date.now()
+    } })
+    open.push(store)
+    await store.saveDraft({ kind: 'new', pages: [page('a')] })
+    fail = true
+    await expect(store.saveDraft({ kind: 'new', pages: [page('b')] })).rejects.toThrow('QuotaExceededError')
+    expect((await store.getDraft())?.pages.map((p) => p.id)).toEqual(['a'])
+    await store.saveDraft({ kind: 'new', pages: [page('c')] })
+    expect((await store.getDraft())?.pages.map((p) => p.id)).toEqual(['c'])
   })
 })

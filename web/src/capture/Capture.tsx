@@ -35,6 +35,8 @@ export function Capture({
   onDone,
   onCancel,
   singlePage = false,
+  onPagesChange,
+  draftError,
   media,
   snap = (video) => grabFrame(video),
 }: {
@@ -42,6 +44,9 @@ export function Capture({
   onCancel: () => void
   /** Restrict capture and import to one replacement page. */
   singlePage?: boolean
+  /** Persist the in-progress capture, including pages not yet sent to review. */
+  onPagesChange?: (pages: Page[]) => void
+  draftError?: string
   /** For tests; defaults to navigator.mediaDevices. */
   media?: { getUserMedia?: (c: MediaStreamConstraints) => Promise<MediaStream> }
   /** For tests; defaults to grabbing a frame from the video. */
@@ -276,7 +281,12 @@ export function Capture({
       setNotice('')
       setConfirmDiscard(false)
       const page = newPage(blob, 'camera')
-      if (multi) setPages((all) => [...all, page])
+      if (multi) {
+        const next = [...held.current, page]
+        held.current = next
+        setPages(next)
+        onPagesChange?.(next)
+      }
       else {
         resume = false
         finish([...pages, page])
@@ -299,14 +309,22 @@ export function Capture({
         : `Skipped ${skipped.length === 1 ? skipped[0] : `${skipped.length} files`}: only images can be imported.`,
     )
     if (added.length === 0) return
-    if (multi) setPages((all) => [...all, ...added])
+    if (multi) {
+      const next = [...held.current, ...added]
+      held.current = next
+      setPages(next)
+      onPagesChange?.(next)
+    }
     else finish([...pages, ...added])
   }
 
   const remove = (id: string) => {
     const page = pages.find((p) => p.id === id)
     if (page) releasePages([page])
-    setPages((all) => all.filter((p) => p.id !== id))
+    const next = held.current.filter((p) => p.id !== id)
+    held.current = next
+    setPages(next)
+    onPagesChange?.(next)
   }
 
   const showVideo = camera.kind !== 'problem'
@@ -379,6 +397,7 @@ export function Capture({
           {notice}
         </p>
       )}
+      {draftError && <p role="alert" className="px-4 pt-2 text-center text-sm text-red-300">{draftError}</p>}
 
       {multi && count > 0 && (
         <ol className="flex gap-2 overflow-x-auto px-3 pt-3" aria-label="Captured pages">

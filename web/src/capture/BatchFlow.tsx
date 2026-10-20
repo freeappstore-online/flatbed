@@ -9,6 +9,8 @@ import { PageReview } from '../ui/PageReview'
 import { usePageReorder } from '../ui/usePageReorder'
 import { Capture } from './Capture'
 import { type Page, movePage, releasePages, uncropped, unfiltered } from './camera'
+import { toInput } from '../library/scans'
+import type { ScanStore } from '../library/store'
 
 type Edit = { id: string; kind: 'crop' | 'filter' }
 
@@ -17,24 +19,38 @@ export function BatchFlow({
   onSave,
   onCancel,
   saveLabel = 'Save scan',
+  store,
+  draftTarget,
+  initialPages = [],
 }: {
   onSave: (pages: Page[]) => Promise<void>
   onCancel: () => void
   saveLabel?: string
+  store: ScanStore
+  draftTarget: { kind: 'new' } | { kind: 'append'; scanId: string }
+  initialPages?: Page[]
 }) {
-  const [stage, setStage] = useState<'capture' | 'review'>('capture')
-  const [pages, setPages] = useState<Page[]>([])
+  const [stage, setStage] = useState<'capture' | 'review'>(initialPages.length ? 'review' : 'capture')
+  const [pages, setPages] = useState<Page[]>(initialPages)
   const [processing, setProcessing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [draftError, setDraftError] = useState('')
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [edit, setEdit] = useState<Edit | null>(null)
   const [reviewing, setReviewing] = useState<string | null>(null)
-  const held = useRef<Page[]>([])
+  const held = useRef<Page[]>(initialPages)
   const active = useRef(true)
+  const persist = (next: Page[]) => {
+    void store.saveDraft({ ...draftTarget, pages: next.map(toInput) }).then(
+      () => { if (active.current) setDraftError('') },
+      () => { if (active.current) setDraftError("Couldn't back up these pages. Keep this tab open until you save the scan.") },
+    )
+  }
   const reorder = usePageReorder(pages.map((page) => page.id), (from, to) => {
     held.current = movePage(held.current, from, to - from)
     setPages(held.current)
+    persist(held.current)
   }, processing || saving)
 
   useEffect(() => {
@@ -50,6 +66,7 @@ export function BatchFlow({
     const next: Page = { ...old, original: old.original ?? old.blob, ...changes, blob, url: URL.createObjectURL(blob) }
     held.current = held.current.map((p) => p.id === old.id ? next : p)
     setPages(held.current)
+    persist(held.current)
     releasePages([old])
     setEdit(null)
   }
@@ -57,6 +74,7 @@ export function BatchFlow({
   const captured = async (added: Page[]) => {
     held.current = [...held.current, ...added]
     setPages(held.current)
+    persist(held.current)
     setStage('review')
     setProcessing(true)
     setError('')
@@ -69,6 +87,7 @@ export function BatchFlow({
       if (cropped !== page) {
         held.current = held.current.map((p) => p.id === page.id ? cropped : p)
         setPages(held.current)
+        persist(held.current)
         releasePages([page])
       }
     }
@@ -80,6 +99,16 @@ export function BatchFlow({
     if (old) releasePages([old])
     held.current = held.current.filter((p) => p.id !== id)
     setPages(held.current)
+    persist(held.current)
+  }
+
+  const discard = async () => {
+    try {
+      await store.discardDraft()
+      onCancel()
+    } catch {
+      setDraftError("Couldn't discard the draft. Try again.")
+    }
   }
 
   const save = async () => {
@@ -122,7 +151,17 @@ export function BatchFlow({
     />
   )
   if (stage === 'capture') return (
-    <Capture onDone={captured} onCancel={() => pages.length ? setStage('review') : onCancel()} />
+    <Capture
+      onDone={captured}
+      onPagesChange={(capturing) => persist([...held.current, ...capturing])}
+      draftError={draftError}
+      onCancel={() => {
+        if (held.current.length) {
+          persist(held.current)
+          setStage('review')
+        } else void discard()
+      }}
+    />
   )
   if (reviewing && pages.some((page) => page.id === reviewing)) return (
     <PageReview
@@ -143,7 +182,7 @@ export function BatchFlow({
         <button
           type="button"
           onClick={() => {
-            if (confirmDiscard || pages.length === 0) onCancel()
+            if (confirmDiscard || pages.length === 0) void discard()
             else setConfirmDiscard(true)
           }}
           disabled={saving || processing}
@@ -156,6 +195,7 @@ export function BatchFlow({
         <p className="text-sm text-white/75">Check each page. Adjust only those that need it, then save the batch.</p>
         {processing && <p role="status" className="mt-2 text-sm">Straightening captured pages…</p>}
         {error && <p role="alert" className="mt-2 text-sm text-red-300">{error}</p>}
+        {draftError && <p role="alert" className="mt-2 text-sm text-red-300">{draftError}</p>}
         {pages.length === 0 && <p className="mt-4 text-sm text-white/75">No pages left. Add a page to continue.</p>}
         {pages.length > 1 && <p className="mt-2 text-sm text-white/75">Drag a Move handle, or choose Move and then tap a destination page.</p>}
         {reorder.movingId && <p role="status" className="mt-2 text-sm">Choose the new position for page {reorder.movingNumber}. Tap a page thumbnail, or choose Move again to cancel.</p>}

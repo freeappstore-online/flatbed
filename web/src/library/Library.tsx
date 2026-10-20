@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@freeappstore/sdk/ui'
 import { BatchFlow } from '../capture/BatchFlow'
 import { scanName } from '../export/sizing'
-import { toInput, useStore } from './scans'
+import { draftPage, toInput, useStore } from './scans'
+import type { Page } from '../capture/camera'
 import type { ScanStore, ScanSummary } from './store'
 
 const DATE = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
@@ -19,7 +20,14 @@ export function Library({
   onPrivacy: () => void
 }) {
   const list = useStore(store, (s) => s.listScans())
+  const draftState = useStore(store, (s) => s.getDraft().then(
+    (draft) => ({ draft, failed: false }),
+    () => ({ draft: undefined, failed: true }),
+  ))
   const [capturing, setCapturing] = useState(false)
+  const [resumePages, setResumePages] = useState<Page[]>([])
+  const [draftError, setDraftError] = useState('')
+  const draft = draftState?.draft
 
   return (
     <>
@@ -29,11 +37,30 @@ export function Library({
       />
       <button
         type="button"
-        onClick={() => setCapturing(true)}
-        className="w-full rounded-[var(--radius)] bg-[var(--ink)] px-4 py-4 text-lg font-semibold text-[var(--paper)] hover:opacity-90 sm:w-auto short:py-2.5 short:text-base"
+        onClick={() => { setResumePages([]); setCapturing(true) }}
+        disabled={!draftState || !!draft}
+        className="w-full rounded-[var(--radius)] bg-[var(--ink)] px-4 py-4 text-lg font-semibold text-[var(--paper)] hover:opacity-90 disabled:opacity-40 sm:w-auto short:py-2.5 short:text-base"
       >
         New scan
       </button>
+
+      {draftState?.failed && <p role="alert" className="mt-3 text-sm text-[var(--danger)]">Couldn't check for an unfinished scan. You can still capture pages, but they may not be recoverable if this tab closes.</p>}
+
+      {draft && !capturing && <section aria-label="Unfinished scan" className="mt-4 rounded-[var(--radius)] border border-[var(--line-strong)] p-4">
+        <h2 className="font-semibold">Unfinished scan</h2>
+        <p className="mt-1 text-sm">{draft.pages.length} {draft.pages.length === 1 ? 'page was' : 'pages were'} saved on this device before you left. Resume to continue, or discard these pages.</p>
+        <div className="mt-3 flex gap-3">
+          <button type="button" className="rounded-[var(--radius-sm)] bg-[var(--ink)] px-4 py-2 font-semibold text-[var(--paper)]" onClick={() => {
+            if (draft.kind === 'append' && draft.scanId) onOpen(draft.scanId)
+            else { setResumePages(draft.pages.map(draftPage)); setCapturing(true) }
+          }}>Resume</button>
+          <button type="button" className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-4 py-2" onClick={async () => {
+            try { setDraftError(''); await store.discardDraft() }
+            catch { setDraftError("Couldn't discard the draft. Try again.") }
+          }}>Discard</button>
+        </div>
+        {draftError && <p role="alert" className="mt-2 text-sm text-[var(--danger)]">{draftError}</p>}
+      </section>}
 
       <section className="mt-6 short:mt-3" aria-labelledby="scans-heading">
         <h2 id="scans-heading" className="font-semibold text-[var(--ink)]">
@@ -63,9 +90,12 @@ export function Library({
 
       {capturing && (
         <BatchFlow
-          onCancel={() => setCapturing(false)}
+          store={store}
+          draftTarget={{ kind: 'new' }}
+          initialPages={resumePages}
+          onCancel={() => { setCapturing(false); setResumePages([]) }}
           onSave={async (pages) => {
-            const scan = await store.createScan(scanName(new Date()), pages.map(toInput))
+            const scan = await store.createScan(scanName(new Date()), pages.map(toInput), true)
             onOpen(scan.id)
           }}
         />

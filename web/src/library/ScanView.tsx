@@ -10,7 +10,7 @@ import { FILTERS, type Filter } from '../filters/filters'
 import { filterBlob } from '../filters/render'
 import { PageReview } from '../ui/PageReview'
 import { usePageReorder } from '../ui/usePageReorder'
-import { toInput, toPage } from './scans'
+import { draftPage, toInput, toPage, useStore } from './scans'
 import type { Scan, ScanStore } from './store'
 
 /** One edit waiting for a page. */
@@ -46,6 +46,12 @@ export function ScanView({
   // New pages start with the filter chosen last, so a run of pages is quick.
   const [lastFilter, setLastFilter] = useState<Filter>('original')
   const [capturing, setCapturing] = useState(false)
+  const [resumePages, setResumePages] = useState<Page[]>([])
+  const draftState = useStore(store, (s) => s.getDraft().then(
+    (draft) => ({ draft, failed: false }),
+    () => ({ draft: undefined, failed: true }),
+  ))
+  const draft = draftState?.draft
   const [retaking, setRetaking] = useState<string | null>(null)
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -143,6 +149,15 @@ export function ScanView({
           {error}
         </p>
       )}
+      {draftState?.failed && <p role="alert" className="mt-3 text-sm text-[var(--danger)]">Couldn't check for unfinished pages. New pages may not be recoverable if this tab closes.</p>}
+      {draft && !capturing && <section aria-label="Unfinished scan" className="mt-4 rounded-[var(--radius)] border border-[var(--line-strong)] p-4">
+        <h2 className="font-semibold">Unfinished scan</h2>
+        <p className="mt-1 text-sm">{draft.pages.length} {draft.pages.length === 1 ? 'page was' : 'pages were'} saved on this device before you left. {draft.kind === 'append' && draft.scanId === scanId ? 'Resume adding these pages, or discard them.' : 'Return to All scans to resume or discard them.'}</p>
+        {draft.kind === 'append' && draft.scanId === scanId && <div className="mt-3 flex gap-3">
+          <button type="button" className="rounded-[var(--radius-sm)] bg-[var(--ink)] px-4 py-2 font-semibold text-[var(--paper)]" onClick={() => { setResumePages(draft.pages.map(draftPage)); setCapturing(true) }}>Resume</button>
+          <button type="button" className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-4 py-2" onClick={() => { void store.discardDraft().catch(() => setError("Couldn't discard the draft. Try again.")) }}>Discard</button>
+        </div>}
+      </section>}
 
       <section className="mt-6" aria-labelledby="pages-heading">
         <div className="flex items-center justify-between gap-3">
@@ -151,8 +166,9 @@ export function ScanView({
           </h2>
           <button
             type="button"
-            onClick={() => setCapturing(true)}
-            className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--panel-strong)]"
+            onClick={() => { setResumePages([]); setCapturing(true) }}
+            disabled={!draftState || !!draft}
+            className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--panel-strong)] disabled:opacity-40"
           >
             Add pages
           </button>
@@ -217,10 +233,13 @@ export function ScanView({
 
       {capturing && (
         <BatchFlow
+          store={store}
+          draftTarget={{ kind: 'append', scanId }}
+          initialPages={resumePages}
           saveLabel="Add to scan"
-          onCancel={() => setCapturing(false)}
+          onCancel={() => { setCapturing(false); setResumePages([]) }}
           onSave={async (added) => {
-            if (!await save(() => store.addPages(scanId, added.map(toInput)))) throw new Error('Save failed')
+            if (!await save(() => store.addPages(scanId, added.map(toInput), true))) throw new Error('Save failed')
             setPages((all) => [...all, ...added.map((page) => ({ ...page, url: URL.createObjectURL(page.blob) }))])
             setCapturing(false)
           }}

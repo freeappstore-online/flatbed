@@ -15,6 +15,10 @@ export function toPage({ scanId: _scanId, ...page }: StoredPage): Page {
   return { ...page, url: URL.createObjectURL(page.blob) }
 }
 
+export function draftPage(page: PageInput): Page {
+  return { ...page, url: URL.createObjectURL(page.blob) }
+}
+
 /**
  * Loads from the store and reloads after every write, so screens stay
  * current. Undefined until the first load finishes.
