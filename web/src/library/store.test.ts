@@ -44,10 +44,10 @@ describe('scans', () => {
     const store = makeStore()
     const crop = { quad: [{ x: 1, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 4 }, { x: 1, y: 4 }], turns: 1 } as PageInput['crop']
     const scan = await store.createScan('Receipt', [
-      page('a', { original: new Blob(['raw']), cropped: new Blob(['cut']), crop, filter: 'bw', source: 'import' }),
+      page('a', { original: new Blob(['raw']), cropped: new Blob(['cut']), crop, filter: 'bw', adjustments: { brightness: 20, contrast: -15 }, source: 'import' }),
     ])
     const [p] = await store.getPages(scan.id)
-    expect(p).toMatchObject({ crop, filter: 'bw', source: 'import' })
+    expect(p).toMatchObject({ crop, filter: 'bw', adjustments: { brightness: 20, contrast: -15 }, source: 'import' })
     expect(await text(p.original)).toBe('raw')
     expect(await text(p.cropped)).toBe('cut')
   })
@@ -194,11 +194,13 @@ describe('persistence', () => {
   it('keeps scans across reopening the database', async () => {
     const dbName = `test-${++n}`
     const a = createScanStore({ dbName, requestPersist: () => Promise.resolve(true) })
-    const { id } = await a.createScan('Kept', [page('a')])
+    const { id } = await a.createScan('Kept', [page('a', { adjustments: { brightness: 25, contrast: -10 }, original: new Blob(['raw']) })])
     await a.close()
     const b = createScanStore({ dbName })
     open.push(b)
     expect((await b.getScan(id))?.name).toBe('Kept')
     expect(await ids(b, id)).toEqual(['a'])
+    expect((await b.getPages(id))[0].adjustments).toEqual({ brightness: 25, contrast: -10 })
+    expect(await text((await b.getPages(id))[0].original)).toBe('raw')
   })
 })

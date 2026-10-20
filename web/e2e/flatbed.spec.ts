@@ -139,6 +139,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await filter.getByRole('button', { name: 'Black & white' }).click()
       await expect(filter.getByRole('button', { name: 'Black & white' })).toHaveAttribute('aria-pressed', 'true')
       await expect(filter.getByRole('img', { name: 'Preview: Black & white' })).toBeVisible()
+      for (let i = 0; i < 4; i++) await filter.getByRole('slider', { name: 'Brightness' }).press('ArrowRight')
+      for (let i = 0; i < 2; i++) await filter.getByRole('slider', { name: 'Contrast' }).press('ArrowLeft')
+      await expect(filter.getByRole('slider', { name: 'Brightness' })).toHaveValue('20')
+      await expect(filter.getByRole('slider', { name: 'Contrast' })).toHaveValue('-10')
       await expectAccessible(page, 'the filter editor')
       await filter.getByRole('button', { name: 'Done' }).click()
 
@@ -153,6 +157,25 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('heading', { name: /^Scan \d{4}-\d\d-\d\d \d\d\.\d\d$/ })).toBeVisible()
       await expect(page.getByRole('heading', { name: '2 pages' })).toBeVisible()
       for (const n of [1, 2]) await expect(page.getByText(`Page ${n} · Black & white`)).toBeVisible()
+      // Each page keeps its own adjustment settings, including after a new crop.
+      await page.getByRole('button', { name: 'Filter page 1' }).click()
+      await expect(dialog(page, 'Filter page 1').getByRole('slider', { name: 'Brightness' })).toHaveValue('20')
+      await expect(dialog(page, 'Filter page 1').getByRole('slider', { name: 'Contrast' })).toHaveValue('-10')
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Keep as is' }).click()
+      await page.reload()
+      await page.getByRole('button', { name: 'Filter page 1' }).click()
+      await expect(dialog(page, 'Filter page 1').getByRole('slider', { name: 'Brightness' })).toHaveValue('20')
+      await expect(dialog(page, 'Filter page 1').getByRole('slider', { name: 'Contrast' })).toHaveValue('-10')
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Keep as is' }).click()
+      await page.getByRole('button', { name: 'Filter page 2' }).click()
+      await expect(dialog(page, 'Filter page 2').getByRole('slider', { name: 'Brightness' })).toHaveValue('0')
+      await dialog(page, 'Filter page 2').getByRole('button', { name: 'Keep as is' }).click()
+      await page.getByRole('button', { name: 'Crop page 1' }).click()
+      await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
+      await page.getByRole('button', { name: 'Filter page 1' }).click()
+      await expect(dialog(page, 'Filter page 1').getByRole('slider', { name: 'Brightness' })).toHaveValue('20')
+      await expect(dialog(page, 'Filter page 1').getByRole('slider', { name: 'Contrast' })).toHaveValue('-10')
+      await dialog(page, 'Filter page 1').getByRole('button', { name: 'Keep as is' }).click()
       // Page 2 kept the detected corners: it's the drawn page straightened (longer of each pair of
       // opposite edges), give or take the edge detector's few pixels.
       const [tl, tr, br, bl] = PAGE_CORNERS

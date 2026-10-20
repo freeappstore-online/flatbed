@@ -100,7 +100,7 @@ export function BatchFlow({
       title={`Crop page ${number}`}
       onSkip={() => setEdit(null)}
       onApply={async (cropped, crop) => {
-        const blob = selected.filter ? await filterBlob(cropped, selected.filter).catch(() => cropped) : cropped
+        const blob = await filterBlob(cropped, selected.filter ?? 'original', selected.adjustments)
         replace(selected, blob, { cropped, crop })
       }}
     />
@@ -110,9 +110,10 @@ export function BatchFlow({
       key={selected.id}
       blob={unfiltered(selected)}
       initial={selected.filter}
+      initialAdjustments={selected.adjustments}
       title={`Filter page ${number}`}
       onSkip={() => setEdit(null)}
-      onApply={(filter, blob) => replace(selected, blob, { filter })}
+      onApply={(filter, adjustments, blob) => replace(selected, blob, { filter, adjustments })}
     />
   )
   if (stage === 'capture') return (

@@ -6,6 +6,7 @@ import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 import { movePage } from '../capture/camera'
 import type { Crop } from '../crop/perspective'
 import type { Filter } from '../filters/filters'
+import type { Adjustments } from '../filters/adjustments'
 
 export const DB_NAME = 'flatbed'
 const DB_VERSION = 1
@@ -31,6 +32,7 @@ export type StoredPage = {
   cropped?: Blob
   crop?: Crop
   filter?: Filter
+  adjustments?: Adjustments
 }
 
 /** A page as the editor holds it; the store adds the scan id. */

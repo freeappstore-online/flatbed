@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Picture, drawPixels, encodeJpeg, openPicture } from '../crop/image'
 import type { Pixels } from '../crop/warp'
 import { FilterPicker } from './FilterPicker'
 import { FILTERS, type Filter, applyFilter } from './filters'
 import { filterBlob } from './render'
 import { FullScreen } from '../ui/FullScreen'
+import { DEFAULT_ADJUSTMENTS, type Adjustments, applyAdjustments, hasAdjustments } from './adjustments'
 
-const PREVIEW_SIDE = 1000
+const PREVIEW_SIDE = 800
 const THUMB_SIDE = 120
 
 type State =
@@ -18,6 +19,7 @@ type State =
 export function FilterEditor({
   blob,
   initial = 'original',
+  initialAdjustments = DEFAULT_ADJUSTMENTS,
   title,
   onApply,
   onSkip,
@@ -27,9 +29,10 @@ export function FilterEditor({
   /** The page before any filter (cropped, if it was). */
   blob: Blob
   initial?: Filter
+  initialAdjustments?: Adjustments
   title: string
   /** The chosen filter and the page with it applied. */
-  onApply: (filter: Filter, filtered: Blob) => void
+  onApply: (filter: Filter, adjustments: Adjustments, filtered: Blob) => void
   /** Leaves the page's filter as it was. */
   onSkip: () => void
   /** For tests; decode and encode default to the browser's canvas. */
@@ -38,6 +41,7 @@ export function FilterEditor({
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [filter, setFilter] = useState<Filter>(initial)
+  const [adjustments, setAdjustments] = useState<Adjustments>(initialAdjustments)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -62,9 +66,10 @@ export function FilterEditor({
     }
   }, [blob, open])
 
+  const filteredPreview = useMemo(() => state.kind === 'ready' ? applyFilter(state.preview, filter) : null, [state, filter])
   useEffect(() => {
-    if (state.kind === 'ready' && canvas.current) drawPixels(canvas.current, applyFilter(state.preview, filter))
-  }, [state, filter])
+    if (filteredPreview && canvas.current) drawPixels(canvas.current, hasAdjustments(adjustments) ? applyAdjustments(filteredPreview, adjustments) : filteredPreview)
+  }, [filteredPreview, adjustments])
 
   useEffect(() => {
     if (state.kind === 'ready') done.current?.focus()
@@ -84,7 +89,7 @@ export function FilterEditor({
     // Let "Applying…" paint before the heavy work.
     await new Promise((r) => setTimeout(r, 0))
     try {
-      onApply(filter, await filterBlob(blob, filter, open, encode))
+      onApply(filter, adjustments, await filterBlob(blob, filter, adjustments, open, encode))
     } catch {
       setError("Couldn't apply the filter. Try again, or keep the page as it is.")
       setWorking(false)
@@ -128,9 +133,29 @@ export function FilterEditor({
         <FilterPicker
           thumb={state.kind === 'ready' ? state.thumb : null}
           value={filter}
+          adjustments={adjustments}
           onChange={setFilter}
           disabled={state.kind !== 'ready' || working}
         />
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          {(['brightness', 'contrast'] as const).map((kind) => (
+            <label key={kind} className="grid gap-1">
+              <span className="flex justify-between"><span className="capitalize">{kind}</span><output>{adjustments[kind] > 0 ? '+' : ''}{adjustments[kind]}%</output></span>
+              <input
+                type="range"
+                aria-label={kind === 'brightness' ? 'Brightness' : 'Contrast'}
+                min="-100"
+                max="100"
+                step="5"
+                value={adjustments[kind]}
+                disabled={state.kind !== 'ready' || working}
+                onChange={(e) => setAdjustments((current) => ({ ...current, [kind]: Number(e.target.value) }))}
+                className="w-full accent-[var(--accent)]"
+              />
+            </label>
+          ))}
+        </div>
+        <button type="button" onClick={() => setAdjustments(DEFAULT_ADJUSTMENTS)} disabled={!hasAdjustments(adjustments) || working} className="self-start text-sm underline disabled:opacity-40">Reset adjustments</button>
         <div className="flex justify-end">
           <button
             ref={done}

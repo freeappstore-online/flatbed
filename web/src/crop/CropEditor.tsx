@@ -32,7 +32,7 @@ export function CropEditor({
   /** A previous crop to start from instead of detecting. */
   initial?: Crop
   title: string
-  onApply: (cropped: Blob, crop: Crop) => void
+  onApply: (cropped: Blob, crop: Crop) => void | Promise<void>
   /** Leaves the page as it is. */
   onSkip: () => void
   /** For tests; decode and encode default to the browser's canvas. */
@@ -157,7 +157,7 @@ export function CropEditor({
     await new Promise((r) => setTimeout(r, 0))
     try {
       const cropped = await encode(warp(picture.pixels(), quad, turns))
-      onApply(cropped, { quad, turns })
+      await onApply(cropped, { quad, turns })
     } catch {
       setError("Couldn't straighten this page. Try again, or keep it as it is.")
       setWorking(false)

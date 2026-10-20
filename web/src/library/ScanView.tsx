@@ -252,7 +252,7 @@ export function ScanView({
           onSkip={nextStep}
           onApply={async (cropped, crop) => {
             // A page that already has a filter gets it again on the new crop.
-            const blob = editing.filter ? await filterBlob(cropped, editing.filter).catch(() => cropped) : cropped
+            const blob = await filterBlob(cropped, editing.filter ?? 'original', editing.adjustments)
             update(editing.id, blob, { cropped, crop })
             nextStep()
           }}
@@ -264,10 +264,11 @@ export function ScanView({
           key={editing.id}
           blob={unfiltered(editing)}
           initial={editing.filter ?? lastFilter}
+          initialAdjustments={editing.adjustments}
           title={`Filter page ${editingNumber}`}
           onSkip={nextStep}
-          onApply={(filter, blob) => {
-            update(editing.id, blob, { filter })
+          onApply={(filter, adjustments, blob) => {
+            update(editing.id, blob, { filter, adjustments })
             setLastFilter(filter)
             nextStep()
           }}

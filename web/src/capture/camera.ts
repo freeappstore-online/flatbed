@@ -3,6 +3,7 @@
 
 import type { Crop } from '../crop/perspective'
 import type { Filter } from '../filters/filters'
+import type { Adjustments } from '../filters/adjustments'
 
 /** One captured page. */
 export type Page = {
@@ -18,6 +19,7 @@ export type Page = {
   /** The cropped page before its filter. */
   cropped?: Blob
   filter?: Filter
+  adjustments?: Adjustments
 }
 
 /** What the crop editor starts from: the page as shot. */

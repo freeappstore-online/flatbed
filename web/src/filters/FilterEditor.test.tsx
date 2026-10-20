@@ -7,6 +7,7 @@ import { paint } from '../test/images'
 import { FilterEditor } from './FilterEditor'
 import type { Filter } from './filters'
 import { filterBlob } from './render'
+import { FILTER_OUTPUT_SIDE } from './render'
 
 afterEach(cleanup)
 
@@ -14,7 +15,7 @@ const RED = paint(4, 4, () => [255, 0, 0])
 const fakePicture = (close = vi.fn()): Picture => ({ width: 4, height: 4, url: 'blob:p', pixels: () => RED, close })
 const encodeAsText = vi.fn(async (p: Pixels) => new Blob([Array.from(p.data.slice(0, 3)).join(',')]))
 
-const setup = (props: { initial?: Filter; open?: (b: Blob) => Promise<Picture> } = {}) => {
+const setup = (props: { initial?: Filter; initialAdjustments?: { brightness: number; contrast: number }; open?: (b: Blob) => Promise<Picture> } = {}) => {
   const onApply = vi.fn()
   const onSkip = vi.fn()
   const blob = new Blob(['page'])
@@ -23,6 +24,7 @@ const setup = (props: { initial?: Filter; open?: (b: Blob) => Promise<Picture> }
       blob={blob}
       title="Filter page 1"
       initial={props.initial}
+      initialAdjustments={props.initialAdjustments}
       open={props.open ?? (async () => fakePicture())}
       encode={encodeAsText}
       onApply={onApply}
@@ -58,8 +60,9 @@ describe('FilterEditor', () => {
     fireEvent.click(choice('Greyscale'))
     fireEvent.click(choice('Done'))
     await waitFor(() => expect(onApply).toHaveBeenCalled())
-    const [filter, blob] = onApply.mock.calls[0] as [Filter, Blob]
+    const [filter, adjustments, blob] = onApply.mock.calls[0] as [Filter, { brightness: number; contrast: number }, Blob]
     expect(filter).toBe('greyscale')
+    expect(adjustments).toEqual({ brightness: 0, contrast: 0 })
     expect(await blob.text()).toBe('76,76,76')
   })
 
@@ -69,7 +72,7 @@ describe('FilterEditor', () => {
     await ready()
     fireEvent.click(choice('Original'))
     fireEvent.click(choice('Done'))
-    await waitFor(() => expect(onApply).toHaveBeenCalledWith('original', blob))
+    await waitFor(() => expect(onApply).toHaveBeenCalledWith('original', { brightness: 0, contrast: 0 }, blob))
     expect(encodeAsText).not.toHaveBeenCalled()
   })
 
@@ -88,12 +91,33 @@ describe('FilterEditor', () => {
     expect(choice('Done').disabled).toBe(true)
     expect(choice('Greyscale').disabled).toBe(true)
   })
+
+  it('previews, resets, and saves per-page brightness and contrast', async () => {
+    const { onApply } = setup({ initialAdjustments: { brightness: 20, contrast: -10 } })
+    await ready()
+    expect((screen.getByRole('slider', { name: 'Brightness' }) as HTMLInputElement).value).toBe('20')
+    expect((screen.getByRole('slider', { name: 'Contrast' }) as HTMLInputElement).value).toBe('-10')
+    fireEvent.change(screen.getByRole('slider', { name: 'Brightness' }), { target: { value: '40' } })
+    fireEvent.click(choice('Done'))
+    await waitFor(() => expect(onApply).toHaveBeenCalled())
+    expect(onApply.mock.calls[0][1]).toEqual({ brightness: 40, contrast: -10 })
+    expect(await (onApply.mock.calls[0][2] as Blob).text()).toBe('255,115,115')
+  })
+
+  it('resets both adjustments to zero', async () => {
+    setup({ initialAdjustments: { brightness: 30, contrast: 20 } })
+    await ready()
+    fireEvent.click(choice('Reset adjustments'))
+    expect((screen.getByRole('slider', { name: 'Brightness' }) as HTMLInputElement).value).toBe('0')
+    expect((screen.getByRole('slider', { name: 'Contrast' }) as HTMLInputElement).value).toBe('0')
+    expect(choice('Reset adjustments').disabled).toBe(true)
+  })
 })
 
 describe('filterBlob', () => {
   it('applies the filter and frees the decoded image', async () => {
     const close = vi.fn()
-    const out = await filterBlob(new Blob(['x']), 'greyscale', async () => fakePicture(close), encodeAsText)
+    const out = await filterBlob(new Blob(['x']), 'greyscale', undefined, async () => fakePicture(close), encodeAsText)
     expect(await out.text()).toBe('76,76,76')
     expect(close).toHaveBeenCalled()
   })
@@ -101,7 +125,19 @@ describe('filterBlob', () => {
   it('returns the same blob for Original without decoding', async () => {
     const blob = new Blob(['x'])
     const open = vi.fn()
-    expect(await filterBlob(blob, 'original', open)).toBe(blob)
+    expect(await filterBlob(blob, 'original', undefined, open)).toBe(blob)
     expect(open).not.toHaveBeenCalled()
+  })
+
+  it('bounds the image used for manual adjustments and re-renders from the source', async () => {
+    const blob = new Blob(['source'])
+    const pixels = vi.fn(() => RED)
+    const close = vi.fn()
+    const open = vi.fn(async () => ({ ...fakePicture(close), pixels }))
+    const adjusted = await filterBlob(blob, 'original', { brightness: -20, contrast: 0 }, open, encodeAsText)
+    expect(pixels).toHaveBeenCalledWith(FILTER_OUTPUT_SIDE)
+    expect(await adjusted.text()).toBe('204,0,0')
+    expect(blob).not.toBe(adjusted)
+    expect(close).toHaveBeenCalled()
   })
 })
