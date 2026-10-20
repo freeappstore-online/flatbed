@@ -32,6 +32,8 @@ async function shootOnePage(page: Page) {
   const camera = dialog(page, 'Capture pages')
   await expect(camera.getByLabel('Camera viewfinder')).toBeVisible()
   await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
+  await camera.getByRole('button', { name: 'Auto capture on' }).click()
+  await camera.getByRole('button', { name: 'Single page' }).click()
   await camera.getByRole('button', { name: 'Take photo' }).click()
 }
 
@@ -48,7 +50,9 @@ test('automatically captures a page held steady in the viewfinder', async ({ pag
   await page.goto('/')
   await page.getByRole('button', { name: 'New scan' }).click()
   await expect(dialog(page, 'Capture pages').getByRole('button', { name: 'Auto capture on' })).toBeVisible()
-  await expect(dialog(page, 'Crop page 1')).toBeVisible({ timeout: 15_000 })
+  await expect(dialog(page, 'Capture pages').getByRole('img', { name: 'Page 1' })).toBeVisible({ timeout: 15_000 })
+  await dialog(page, 'Capture pages').getByRole('button', { name: 'Done' }).click()
+  await expect(dialog(page, 'Review pages').getByRole('img', { name: 'Page 1' })).toBeVisible()
 })
 
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -71,15 +75,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await camera.getByRole('button', { name: 'Auto capture on' }).click()
       await expect(camera).toHaveCSS('background-color', 'rgb(0, 0, 0)') // dark in either theme
       await expectAccessible(page, 'the camera')
-      await camera.getByRole('button', { name: 'Multi-page' }).click()
+      await expect(camera.getByRole('button', { name: 'Multi-page' })).toHaveAttribute('aria-pressed', 'true')
       for (const n of [1, 2]) {
         await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
         await camera.getByRole('button', { name: 'Take photo' }).click()
         await expect(camera.getByRole('img', { name: `Page ${n}` })).toBeVisible()
       }
       await camera.getByRole('button', { name: 'Done' }).click()
+      const review = dialog(page, 'Review pages')
+      await expect(review.getByRole('button', { name: 'Save scan' })).toBeEnabled()
+      await expect(review.getByText('Page 2 · Auto-cropped')).toBeVisible()
+      await expectAccessible(page, 'the batch review')
 
-      // Crop: the page's edges are found, close to where the fake camera drew them.
+      // Only page 1 needs a manual crop adjustment.
+      await review.getByRole('button', { name: 'Crop page 1' }).click()
       const crop = dialog(page, 'Crop page 1')
       await expect(crop.getByText('Found the page. Drag the corners to adjust.')).toBeVisible()
       for (const [i, name] of ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'].entries()) {
@@ -104,6 +113,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await crop.getByRole('button', { name: 'Done' }).click()
 
       // Filter: pick black & white from the previews.
+      await review.getByRole('button', { name: 'Filter page 1' }).click()
       const filter = dialog(page, 'Filter page 1')
       await expect(filter.getByRole('img', { name: 'Preview: Original' })).toBeVisible()
       await filter.getByRole('button', { name: 'Black & white' }).click()
@@ -112,13 +122,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page, 'the filter editor')
       await filter.getByRole('button', { name: 'Done' }).click()
 
-      // Page 2: its edges are found too, and it starts with the filter chosen for page 1.
-      const crop2 = dialog(page, 'Crop page 2')
-      await expect(crop2.getByText('Found the page. Drag the corners to adjust.')).toBeVisible()
-      await crop2.getByRole('button', { name: 'Done' }).click()
+      // Page 2 was straightened automatically; adjust only its filter.
+      await review.getByRole('button', { name: 'Filter page 2' }).click()
       const filter2 = dialog(page, 'Filter page 2')
-      await expect(filter2.getByRole('button', { name: 'Black & white' })).toHaveAttribute('aria-pressed', 'true')
+      await filter2.getByRole('button', { name: 'Black & white' }).click()
       await filter2.getByRole('button', { name: 'Done' }).click()
+      await review.getByRole('button', { name: 'Save scan' }).click()
 
       // The saved scan: two straightened pages.
       await expect(page.getByRole('heading', { name: /^Scan \d{4}-\d\d-\d\d \d\d\.\d\d$/ })).toBeVisible()
@@ -162,19 +171,37 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto('/')
       await page.getByRole('button', { name: 'New scan' }).click()
       const camera = dialog(page, 'Capture pages')
-      await camera.getByRole('button', { name: 'Multi-page' }).click()
-      for (const n of [1, 2, 3]) {
+      await camera.getByRole('button', { name: 'Auto capture on' }).click()
+      for (const n of [1, 2]) {
         await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
         await camera.getByRole('button', { name: 'Take photo' }).click()
         await expect(camera.getByText(`${n} page${n > 1 ? 's' : ''}`)).toBeVisible()
       }
       await camera.getByRole('button', { name: 'Done' }).click()
-
-      // Each page is offered for crop then filter; keep them all as they are.
-      for (const n of [1, 2, 3]) {
-        await dialog(page, `Crop page ${n}`).getByRole('button', { name: 'Keep as is' }).click()
-        await dialog(page, `Filter page ${n}`).getByRole('button', { name: 'Keep as is' }).click()
-      }
+      const review = dialog(page, 'Review pages')
+      await expect(review.getByRole('img', { name: 'Page 2' })).toBeVisible()
+      await review.getByRole('button', { name: 'Add pages' }).click()
+      await camera.getByRole('button', { name: 'Auto capture on' }).click()
+      await camera.getByRole('button', { name: 'Take photo' }).click()
+      await expect(camera.getByRole('img', { name: 'Page 1' })).toBeVisible()
+      await camera.getByRole('button', { name: 'Done' }).click()
+      await expect(review.getByRole('img', { name: 'Page 3' })).toBeVisible()
+      const beforeSave = await page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('flatbed')
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        const count = await new Promise<number>((resolve, reject) => {
+          const request = db.transaction('scans').objectStore('scans').count()
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        db.close()
+        return count
+      })
+      expect(beforeSave).toBe(0)
+      await review.getByRole('button', { name: 'Save scan' }).click()
       await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
 
       // Retake just the middle page. Cancellation preserves every image.
@@ -258,11 +285,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(camera.getByRole('button', { name: 'Try again' })).toBeVisible()
       await expectAccessible(page, 'the blocked camera')
 
+      await camera.getByRole('button', { name: 'Single page' }).click()
       await camera.getByTestId('import-input').setInputFiles(await pagePhoto(page))
+      const review = dialog(page, 'Review pages')
+      await review.getByRole('button', { name: 'Crop page 1' }).click()
       await expect(dialog(page, 'Crop page 1').getByText('Found the page. Drag the corners to adjust.')).toBeVisible()
       await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
+      await review.getByRole('button', { name: 'Filter page 1' }).click()
       await dialog(page, 'Filter page 1').getByRole('button', { name: 'Magic colour' }).click()
       await dialog(page, 'Filter page 1').getByRole('button', { name: 'Done' }).click()
+      await review.getByRole('button', { name: 'Save scan' }).click()
       await expect(page.getByText('Page 1 · Magic colour')).toBeVisible()
     })
 
@@ -283,9 +315,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('button', { name: 'New scan' })).toBeVisible()
 
       await shootOnePage(page)
-      await dialog(page, 'Crop page 1').getByRole('button', { name: 'Done' }).click()
+      const review = dialog(page, 'Review pages')
+      await review.getByRole('button', { name: 'Filter page 1' }).click()
       await dialog(page, 'Filter page 1').getByRole('button', { name: 'Greyscale' }).click()
       await dialog(page, 'Filter page 1').getByRole('button', { name: 'Done' }).click()
+      await review.getByRole('button', { name: 'Save scan' }).click()
       await expect(page.getByRole('heading', { name: '1 page' })).toBeVisible()
 
       // pdf-lib loads on demand; it must come from the precache.

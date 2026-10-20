@@ -33,8 +33,7 @@ async function viewfinder(width: number, height: number) {
     { x: 90, y: 45 }, { x: 270, y: 45 }, { x: 270, y: 135 }, { x: 90, y: 135 },
   ])
   vi.useFakeTimers()
-  // Restart the effect under fake timers by taking a multi-page capture.
-  fireEvent.click(screen.getByRole('button', { name: 'Multi-page' }))
+  // Restart the effect under fake timers by taking a capture.
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Take photo' })) })
   return { ...view, context, video, snap }
 }

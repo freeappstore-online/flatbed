@@ -1,6 +1,7 @@
 import { type ComponentProps, type FormEvent, useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@freeappstore/sdk/ui'
 import { Capture } from '../capture/Capture'
+import { BatchFlow } from '../capture/BatchFlow'
 import { type Page, movePage, releasePages, uncropped, unfiltered } from '../capture/camera'
 import { CropEditor } from '../crop/CropEditor'
 import { ExportPanel } from '../export/ExportPanel'
@@ -193,13 +194,13 @@ export function ScanView({
       <DeleteScan name={scan.name} pages={pages.length} onDelete={async () => (await save(() => store.deleteScan(scanId))) && onClose()} />
 
       {capturing && (
-        <Capture
+        <BatchFlow
+          saveLabel="Add to scan"
           onCancel={() => setCapturing(false)}
-          onDone={(added) => {
+          onSave={async (added) => {
+            if (!await save(() => store.addPages(scanId, added.map(toInput)))) throw new Error('Save failed')
+            setPages((all) => [...all, ...added.map((page) => ({ ...page, url: URL.createObjectURL(page.blob) }))])
             setCapturing(false)
-            setPages((all) => [...all, ...added])
-            setSteps((q) => [...q, ...added.map((p) => p.id).flatMap(newSteps)])
-            save(() => store.addPages(scanId, added.map(toInput)))
           }}
         />
       )}

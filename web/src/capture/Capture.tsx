@@ -48,7 +48,7 @@ export function Capture({
 }) {
   const [camera, setCamera] = useState<Camera>({ kind: 'starting' })
   const [attempt, setAttempt] = useState(0)
-  const [multi, setMulti] = useState(false)
+  const [multi, setMulti] = useState(!singlePage)
   const [automatic, setAutomatic] = useState(true)
   const [pages, setPages] = useState<Page[]>([])
   const [notice, setNotice] = useState('')
@@ -215,7 +215,7 @@ export function Capture({
       if (multi) setPages((all) => [...all, page])
       else {
         resume = false
-        finish([page])
+        finish([...pages, page])
       }
     } finally {
       shooting.current = false
@@ -357,8 +357,9 @@ export function Capture({
               key={String(m)}
               type="button"
               aria-pressed={multi === m}
+              disabled={!m && count > 0}
               onClick={() => setMulti(m)}
-              className={`rounded-full px-4 py-1.5 ${multi === m ? 'bg-white text-black' : ''}`}
+              className={`rounded-full px-4 py-1.5 disabled:opacity-40 ${multi === m ? 'bg-white text-black' : ''}`}
             >
               {m ? 'Multi-page' : 'Single page'}
             </button>

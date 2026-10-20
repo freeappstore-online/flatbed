@@ -35,7 +35,7 @@ describe('Capture with a camera', () => {
 
   it('hands back one page per shot in single-page mode', async () => {
     const onDone = vi.fn()
-    render(<Capture media={liveCamera().media} snap={snap} onDone={onDone} onCancel={() => {}} />)
+    render(<Capture singlePage media={liveCamera().media} snap={snap} onDone={onDone} onCancel={() => {}} />)
     await live()
     fireEvent.click(shutter())
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
@@ -46,7 +46,7 @@ describe('Capture with a camera', () => {
 
   it('shoots when the viewfinder itself is tapped', async () => {
     const onDone = vi.fn()
-    render(<Capture media={liveCamera().media} snap={snap} onDone={onDone} onCancel={() => {}} />)
+    render(<Capture singlePage media={liveCamera().media} snap={snap} onDone={onDone} onCancel={() => {}} />)
     await live()
     fireEvent.click(screen.getByLabelText('Camera viewfinder'))
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
@@ -56,9 +56,10 @@ describe('Capture with a camera', () => {
     const onDone = vi.fn()
     render(<Capture media={liveCamera().media} snap={snap} onDone={onDone} onCancel={() => {}} />)
     await live()
-    fireEvent.click(screen.getByRole('button', { name: 'Multi-page' }))
+    expect(screen.getByRole('button', { name: 'Multi-page' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(shutter())
     await screen.findByAltText('Page 1')
+    expect((screen.getByRole('button', { name: 'Single page' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(shutter())
     await screen.findByAltText('Page 2')
     fireEvent.click(shutter())
@@ -104,7 +105,6 @@ describe('Capture with a camera', () => {
     onCancel.mockClear()
     render(<Capture media={liveCamera().media} snap={snap} onDone={() => {}} onCancel={onCancel} />)
     await live()
-    fireEvent.click(screen.getByRole('button', { name: 'Multi-page' }))
     fireEvent.click(shutter())
     await screen.findByAltText('Page 1')
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -151,6 +151,8 @@ describe('Capture without a camera', () => {
     await screen.findByRole('alert')
     const photos = [new File(['a'], 'a.jpg', { type: 'image/jpeg' }), new File(['b'], 'b.png', { type: 'image/png' })]
     pickFiles([...photos, new File(['c'], 'c.pdf', { type: 'application/pdf' })])
+    expect(screen.getAllByRole('img', { name: /^Page/ })).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(onDone).toHaveBeenCalledTimes(1)
     const pages = onDone.mock.calls[0][0] as Page[]
     expect(pages.map((p) => p.blob)).toEqual(photos)
@@ -170,7 +172,6 @@ describe('Capture without a camera', () => {
     const onDone = vi.fn()
     render(<Capture media={liveCamera().media} snap={snap} onDone={onDone} onCancel={() => {}} />)
     await live()
-    fireEvent.click(screen.getByRole('button', { name: 'Multi-page' }))
     fireEvent.click(shutter())
     await screen.findByAltText('Page 1')
     pickFiles([new File(['a'], 'a.jpg', { type: 'image/jpeg' })])

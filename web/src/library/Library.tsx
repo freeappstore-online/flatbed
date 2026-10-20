@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@freeappstore/sdk/ui'
-import { Capture } from '../capture/Capture'
-import { releasePages } from '../capture/camera'
+import { BatchFlow } from '../capture/BatchFlow'
 import { scanName } from '../export/sizing'
 import { toInput, useStore } from './scans'
 import type { ScanStore, ScanSummary } from './store'
@@ -15,13 +14,12 @@ export function Library({
   onPrivacy,
 }: {
   store: ScanStore
-  /** Opens a scan; `edit` lists new pages to crop and filter first. */
+  /** Opens a saved scan. */
   onOpen: (id: string, edit?: string[]) => void
   onPrivacy: () => void
 }) {
   const list = useStore(store, (s) => s.listScans())
   const [capturing, setCapturing] = useState(false)
-  const [error, setError] = useState('')
 
   return (
     <>
@@ -36,11 +34,6 @@ export function Library({
       >
         New scan
       </button>
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-[var(--danger)]">
-          {error}
-        </p>
-      )}
 
       <section className="mt-6 short:mt-3" aria-labelledby="scans-heading">
         <h2 id="scans-heading" className="font-semibold text-[var(--ink)]">
@@ -69,18 +62,11 @@ export function Library({
       </p>
 
       {capturing && (
-        <Capture
+        <BatchFlow
           onCancel={() => setCapturing(false)}
-          onDone={async (pages) => {
-            setCapturing(false)
-            try {
-              const scan = await store.createScan(scanName(new Date()), pages.map(toInput))
-              onOpen(scan.id, scan.pages)
-            } catch {
-              setError("Couldn't save the scan. Your browser's storage for this site may be full.")
-            } finally {
-              releasePages(pages)
-            }
+          onSave={async (pages) => {
+            const scan = await store.createScan(scanName(new Date()), pages.map(toInput))
+            onOpen(scan.id)
           }}
         />
       )}
