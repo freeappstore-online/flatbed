@@ -55,6 +55,25 @@ test('automatically captures a page held steady in the viewfinder', async ({ pag
   await expect(dialog(page, 'Review pages').getByRole('img', { name: 'Page 1' })).toBeVisible()
 })
 
+test('toggles a supported camera torch and turns it off on exit', async ({ page }) => {
+  await useFakeCamera(page, { torch: true })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New scan' }).click()
+  const camera = dialog(page, 'Capture pages')
+  await camera.getByRole('button', { name: 'Auto capture on' }).click()
+  await expect(camera.getByRole('button', { name: 'Torch off' })).toBeVisible()
+  await camera.getByRole('button', { name: 'Torch off' }).click()
+  await expect(camera.getByRole('button', { name: 'Torch on' })).toHaveAttribute('aria-pressed', 'true')
+  await camera.getByRole('button', { name: 'Torch on' }).click()
+  await expect(camera.getByRole('button', { name: 'Torch off' })).toHaveAttribute('aria-pressed', 'false')
+  await camera.getByRole('button', { name: 'Torch off' }).click()
+  await camera.getByRole('button', { name: 'Cancel' }).click()
+  await expect.poll(() => page.evaluate(() => (window as Window & { __flatbedTorch?: (boolean | 'stop')[] }).__flatbedTorch)).toContain('stop')
+  const calls = await page.evaluate(() => (window as Window & { __flatbedTorch?: (boolean | 'stop')[] }).__flatbedTorch)
+  expect(calls).toContain(true)
+  expect(calls).toContain(false)
+})
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
     test.use({ colorScheme })
@@ -71,6 +90,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'New scan' }).click()
       const camera = dialog(page, 'Capture pages')
       await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
+      await expect(camera.getByRole('button', { name: /Torch/ })).toHaveCount(0)
       // This journey exercises the manual shutter; keep auto capture for its own test.
       await camera.getByRole('button', { name: 'Auto capture on' }).click()
       await expect(camera).toHaveCSS('background-color', 'rgb(0, 0, 0)') // dark in either theme

@@ -12,6 +12,7 @@ import {
 import { FullScreen } from '../ui/FullScreen'
 import { DETECT_SIDE, detectQuad } from '../crop/edges'
 import { autoCapture } from './auto'
+import { applyTorch, supportsTorch } from './torch'
 
 type Camera = { kind: 'starting' } | { kind: 'live' } | { kind: 'problem'; problem: CameraProblem }
 
@@ -50,6 +51,10 @@ export function Capture({
   const [attempt, setAttempt] = useState(0)
   const [multi, setMulti] = useState(!singlePage)
   const [automatic, setAutomatic] = useState(true)
+  const [torchAvailable, setTorchAvailable] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+  const [torchBusy, setTorchBusy] = useState(false)
+  const [torchError, setTorchError] = useState('')
   const [pages, setPages] = useState<Page[]>([])
   const [notice, setNotice] = useState('')
   const [flash, setFlash] = useState(false)
@@ -63,6 +68,10 @@ export function Capture({
   const picker = useRef<HTMLInputElement>(null)
   const shutter = useRef<HTMLButtonElement>(null)
   const shooting = useRef(false)
+  const torchTrack = useRef<MediaStreamTrack | null>(null)
+  const torchEnabled = useRef(false)
+  const torchChanging = useRef(false)
+  const torchPending = useRef<Promise<void>>(Promise.resolve())
   // Pages not yet handed over, so unmounting can free them.
   const held = useRef<Page[]>([])
   held.current = pages
@@ -71,7 +80,13 @@ export function Capture({
   useEffect(() => {
     let stopped = false
     let stream: MediaStream | undefined
+    let track: MediaStreamTrack | undefined
+    let hasTorch = false
     setCamera({ kind: 'starting' })
+    setTorchAvailable(false)
+    setTorchOn(false)
+    setTorchBusy(false)
+    setTorchError('')
     ;(async () => {
       const result = await openCamera(mediaDevices)
       if (stopped) {
@@ -80,6 +95,15 @@ export function Capture({
       }
       if ('problem' in result) return setCamera({ kind: 'problem', problem: result.problem })
       stream = result.stream
+      track = stream.getVideoTracks?.()[0]
+      hasTorch = supportsTorch(track)
+      if (hasTorch && track) {
+        torchTrack.current = track
+        try { torchEnabled.current = track.getSettings?.().torch === true }
+        catch { torchEnabled.current = false }
+        setTorchOn(torchEnabled.current)
+        setTorchAvailable(true)
+      }
       const v = video.current
       if (v) {
         v.srcObject = stream
@@ -89,6 +113,11 @@ export function Capture({
     })()
     return () => {
       stopped = true
+      if (hasTorch && track) {
+        if (torchTrack.current === track) torchTrack.current = null
+        // Stop ends the hardware light even if an in-flight constraint request rejects.
+        void torchPending.current.catch(() => {}).then(() => applyTorch(track!, false)).catch(() => {})
+      }
       stopCamera(stream)
     }
     // mediaDevices is fixed for the life of the screen; attempt re-runs this for "Try again".
@@ -179,6 +208,7 @@ export function Capture({
 
   const finish = (all: Page[]) => {
     stopDetection.current()
+    turnOffTorch()
     held.current = []
     setPages([])
     onDone(all)
@@ -191,9 +221,43 @@ export function Capture({
     }
     releasePages(pages)
     stopDetection.current()
+    turnOffTorch()
     held.current = []
     setPages([])
     onCancel()
+  }
+
+  const turnOffTorch = () => {
+    const track = torchTrack.current
+    if (!track) return
+    torchTrack.current = null
+    torchEnabled.current = false
+    setTorchOn(false)
+    torchPending.current = torchPending.current.catch(() => {}).then(() => applyTorch(track, false))
+    void torchPending.current.catch(() => {})
+  }
+
+  const toggleTorch = async () => {
+    const track = torchTrack.current
+    if (!track || torchChanging.current) return
+    const enabled = !torchEnabled.current
+    torchChanging.current = true
+    setTorchBusy(true)
+    setTorchError('')
+    const task = torchPending.current.catch(() => {}).then(() => applyTorch(track, enabled))
+    torchPending.current = task
+    try {
+      await task
+      if (torchTrack.current === track) {
+        torchEnabled.current = enabled
+        setTorchOn(enabled)
+      }
+    } catch {
+      if (torchTrack.current === track) setTorchError("Couldn't change the torch. Try again, or scan without it.")
+    } finally {
+      torchChanging.current = false
+      if (torchTrack.current === track) setTorchBusy(false)
+    }
   }
 
   const shoot = async () => {
@@ -336,18 +400,32 @@ export function Capture({
 
       <div className="flex flex-col gap-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {camera.kind === 'live' && (
-          <button
-            type="button"
-            aria-pressed={automatic}
-            onClick={() => {
-              auto.current = autoCapture()
-              setAutomatic((enabled) => !enabled)
-            }}
-            className="mx-auto rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold"
-          >
-            Auto capture {automatic ? 'on' : 'off'}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              aria-pressed={automatic}
+              onClick={() => {
+                auto.current = autoCapture()
+                setAutomatic((enabled) => !enabled)
+              }}
+              className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold"
+            >
+              Auto capture {automatic ? 'on' : 'off'}
+            </button>
+            {torchAvailable && (
+              <button
+                type="button"
+                aria-pressed={torchOn}
+                disabled={torchBusy}
+                onClick={toggleTorch}
+                className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+              >
+                Torch {torchOn ? 'on' : 'off'}
+              </button>
+            )}
+          </div>
         )}
+        {torchError && <p role="alert" className="text-center text-sm text-red-300">{torchError}</p>}
         {automatic && camera.kind === 'live' && (
           <p className="text-center text-xs text-white/75">Hold the page steady to scan automatically. Move it out of view before the next page.</p>
         )}

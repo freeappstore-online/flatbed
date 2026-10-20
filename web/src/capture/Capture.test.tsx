@@ -14,6 +14,18 @@ const liveCamera = () => {
   const { stream, track } = fakeStream()
   return { media: { getUserMedia: vi.fn().mockResolvedValue(stream) }, track }
 }
+const torchCamera = (supported = true, fails = false) => {
+  const track = {
+    kind: 'video',
+    stop: vi.fn(),
+    getCapabilities: vi.fn(() => ({ torch: supported })),
+    getSettings: vi.fn(() => ({ torch: false })),
+    getConstraints: vi.fn(() => ({ width: { ideal: 1920 } })),
+    applyConstraints: fails ? vi.fn().mockRejectedValue(new Error('Torch unavailable')) : vi.fn().mockResolvedValue(undefined),
+  }
+  const stream = { getTracks: () => [track], getVideoTracks: () => [track] } as unknown as MediaStream
+  return { media: { getUserMedia: vi.fn().mockResolvedValue(stream) }, track }
+}
 const denied = (name: string) => ({
   getUserMedia: () => Promise.reject(Object.assign(new Error(name), { name })),
 })
@@ -92,6 +104,58 @@ describe('Capture with a camera', () => {
     await live()
     view.unmount()
     expect(track.stop).toHaveBeenCalled()
+  })
+
+  it('toggles a supported torch, then turns it off when capture ends', async () => {
+    const { media, track } = torchCamera()
+    const onDone = vi.fn()
+    const view = render(<Capture singlePage media={media} snap={snap} onDone={onDone} onCancel={() => {}} />)
+    await live()
+    const off = await screen.findByRole('button', { name: 'Torch off' })
+    expect(off.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(off)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Torch on' }).getAttribute('aria-pressed')).toBe('true'))
+    expect(track.applyConstraints).toHaveBeenCalledWith({ width: { ideal: 1920 }, advanced: [{ torch: true }] })
+    fireEvent.click(shutter())
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(track.applyConstraints).toHaveBeenCalledWith({ width: { ideal: 1920 }, advanced: [{ torch: false }] }))
+    view.unmount()
+    expect(track.stop).toHaveBeenCalled()
+  })
+
+  it('hides unsupported torch controls while capture and import still work', async () => {
+    const { media, track } = torchCamera(false)
+    const onDone = vi.fn()
+    render(<Capture media={media} snap={snap} onDone={onDone} onCancel={() => {}} />)
+    await live()
+    expect(screen.queryByRole('button', { name: /Torch/ })).toBeNull()
+    fireEvent.click(shutter())
+    await screen.findByAltText('Page 1')
+    pickFiles([new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })])
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onDone.mock.calls[0][0]).toHaveLength(2)
+    expect(track.applyConstraints).not.toHaveBeenCalled()
+  })
+
+  it('reports a rejected torch change without disabling the shutter', async () => {
+    const { media } = torchCamera(true, true)
+    render(<Capture media={media} snap={snap} onDone={() => {}} onCancel={() => {}} />)
+    await live()
+    fireEvent.click(await screen.findByRole('button', { name: 'Torch off' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn't change the torch/)
+    expect(shutter().disabled).toBe(false)
+    expect(screen.getByRole('button', { name: 'Torch off' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('stops an illuminated track on unmount', async () => {
+    const { media, track } = torchCamera()
+    const view = render(<Capture media={media} snap={snap} onDone={() => {}} onCancel={() => {}} />)
+    await live()
+    fireEvent.click(await screen.findByRole('button', { name: 'Torch off' }))
+    await screen.findByRole('button', { name: 'Torch on' })
+    view.unmount()
+    expect(track.stop).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(track.applyConstraints).toHaveBeenCalledWith({ width: { ideal: 1920 }, advanced: [{ torch: false }] }))
   })
 
   it('cancels straight away with no pages, and confirms before discarding pages', async () => {

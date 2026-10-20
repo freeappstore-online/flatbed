@@ -15,9 +15,9 @@ export const PAGE_CORNERS = [
  * dark desk. With `deny`, it refuses as a blocked permission does.
  * Also hides the Web Share API, so export downloads the PDF.
  */
-export async function useFakeCamera(page: Page, { deny = false } = {}) {
+export async function useFakeCamera(page: Page, { deny = false, torch = false } = {}) {
   await page.addInitScript(
-    ({ frame, corners, deny }) => {
+    ({ frame, corners, deny, torch }) => {
       Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
       Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true })
 
@@ -57,14 +57,34 @@ export async function useFakeCamera(page: Page, { deny = false } = {}) {
           requestAnimationFrame(draw)
         }
         requestAnimationFrame(draw)
-        return canvas.captureStream(30)
+        const stream = canvas.captureStream(30)
+        if (torch) {
+          const track = stream.getVideoTracks()[0]
+          let enabled = false
+          const calls: (boolean | 'stop')[] = []
+          ;(window as Window & { __flatbedTorch?: typeof calls }).__flatbedTorch = calls
+          Object.defineProperty(track, 'getCapabilities', { value: () => ({ torch: true }) })
+          Object.defineProperty(track, 'getSettings', { value: () => ({ torch: enabled }) })
+          Object.defineProperty(track, 'getConstraints', { value: () => ({ width: { ideal: 1920 } }) })
+          Object.defineProperty(track, 'applyConstraints', { value: async (constraints: MediaTrackConstraints) => {
+            enabled = Boolean((constraints.advanced?.at(-1) as { torch?: boolean } | undefined)?.torch)
+            calls.push(enabled)
+          } })
+          const stop = track.stop.bind(track)
+          Object.defineProperty(track, 'stop', { value: () => {
+            calls.push('stop')
+            enabled = false
+            stop()
+          } })
+        }
+        return stream
       }
       Object.defineProperty(navigator, 'mediaDevices', {
         value: { getUserMedia, enumerateDevices: async () => [] },
         configurable: true,
       })
     },
-    { frame: FRAME, corners: PAGE_CORNERS, deny },
+    { frame: FRAME, corners: PAGE_CORNERS, deny, torch },
   )
 }
 
