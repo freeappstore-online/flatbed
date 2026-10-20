@@ -234,6 +234,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(camera.getByRole('img', { name: 'Page 1' })).toBeVisible()
       await camera.getByRole('button', { name: 'Done' }).click()
       await expect(review.getByRole('img', { name: 'Page 3' })).toBeVisible()
+      await expect(review.getByText('Straightening captured pages…')).toHaveCount(0)
+      const batchSrcs = () => review.getByRole('img', { name: /^Page \d$/ }).evaluateAll((imgs) => imgs.map((img) => (img as HTMLImageElement).src))
+      const batchOrder = await batchSrcs()
+      await review.getByRole('button', { name: 'Move page 1', exact: true }).press('Enter')
+      await review.getByRole('button', { name: 'Place page 1 at position 3' }).press('Enter')
+      expect(await batchSrcs()).toEqual([batchOrder[1], batchOrder[2], batchOrder[0]])
+      await review.getByRole('button', { name: 'Move page 3', exact: true }).click()
+      await review.getByRole('button', { name: 'Place page 3 at position 1' }).click()
+      expect(await batchSrcs()).toEqual(batchOrder)
       const beforeSave = await page.evaluate(async () => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('flatbed')
@@ -309,12 +318,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
       expect(await savedPages()).toEqual(afterRetake)
       await expect(page.getByText('Page 2 · Greyscale')).toBeVisible()
 
-      // Reorder: page 1 moves to the end.
+      // Drag page 1 directly to the end; the PDF and reload use this order.
       const srcs = () => page.getByRole('img', { name: /^Page \d$/ }).evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src))
       const [first, second, third] = await srcs()
-      await page.getByRole('button', { name: 'Move page 1 later' }).click()
-      await page.getByRole('button', { name: 'Move page 2 later' }).click()
+      const storedOrder = () => page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('flatbed')
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        const scans = await new Promise<{ pages: string[] }[]>((resolve, reject) => {
+          const request = db.transaction('scans').objectStore('scans').getAll()
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        db.close()
+        return scans[0].pages
+      })
+      const [firstId, secondId, thirdId] = await storedOrder()
+      await page.getByRole('button', { name: 'Move page 1', exact: true }).dragTo(page.locator('li[data-reorder-id]').nth(2))
       expect(await srcs()).toEqual([second, third, first])
+      await expect.poll(storedOrder).toEqual([secondId, thirdId, firstId])
+      await page.reload()
+      expect(await storedOrder()).toEqual([secondId, thirdId, firstId])
 
       // Rename.
       await page.getByRole('button', { name: 'Rename' }).click()

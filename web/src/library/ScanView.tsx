@@ -9,6 +9,7 @@ import { FilterEditor } from '../filters/FilterEditor'
 import { FILTERS, type Filter } from '../filters/filters'
 import { filterBlob } from '../filters/render'
 import { PageReview } from '../ui/PageReview'
+import { usePageReorder } from '../ui/usePageReorder'
 import { toInput, toPage } from './scans'
 import type { Scan, ScanStore } from './store'
 
@@ -83,6 +84,12 @@ export function ScanView({
     }
   }
 
+  const move = (from: number, by: number) => {
+    setPages(movePage(pages, from, by))
+    save(() => store.movePage(scanId, from, by))
+  }
+  const reorder = usePageReorder(pages.map((page) => page.id), (from, to) => move(from, to - from))
+
   if (scan === undefined) return <p className="text-[var(--muted)]">Opening the scan…</p>
   if (scan === null)
     return (
@@ -115,11 +122,6 @@ export function ScanView({
     setPages(pages.filter((p) => p.id !== id))
     setSteps((q) => q.filter((s) => s.id !== id))
     save(() => store.removePage(scanId, id))
-  }
-
-  const move = (from: number, by: number) => {
-    setPages(movePage(pages, from, by))
-    save(() => store.movePage(scanId, from, by))
   }
 
   return (
@@ -156,11 +158,13 @@ export function ScanView({
           </button>
         </div>
         {pages.length === 0 && <p className="mt-2 text-sm text-[var(--muted)]">This scan has no pages. Add some to export it.</p>}
-        <ol className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {pages.length > 1 && <p className="mt-2 text-sm text-[var(--muted)]">Drag a Move handle, or choose Move and then tap a destination page.</p>}
+        {reorder.movingId && <p role="status" className="mt-2 text-sm text-[var(--ink)]">Choose the new position for page {reorder.movingNumber}. Tap a page thumbnail, or choose Move again to cancel.</p>}
+        <ol className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3" onDragStart={(event) => event.preventDefault()}>
           {pages.map((page, i) => (
-            <li key={page.id} className="rounded-[var(--radius)] border border-[var(--line)] p-2">
-              <button type="button" onClick={() => setReviewing(page.id)} aria-label={`Review page ${i + 1}`} className="block w-full rounded">
-                <img src={page.url} alt={`Page ${i + 1}`} className="aspect-[3/4] w-full rounded object-cover" />
+            <li key={page.id} data-reorder-id={page.id} className={`rounded-[var(--radius)] border border-[var(--line)] p-2 ${reorder.target === page.id ? 'ring-2 ring-[var(--ink)]' : ''} ${reorder.dragging === page.id ? 'opacity-60' : ''}`}>
+              <button type="button" onClick={() => { if (!reorder.choose(page.id)) setReviewing(page.id) }} aria-label={reorder.movingId ? `Place page ${reorder.movingNumber} at position ${i + 1}` : `Review page ${i + 1}`} className="block w-full rounded">
+                <img src={page.url} alt={`Page ${i + 1}`} draggable={false} className="aspect-[3/4] w-full rounded object-cover" />
               </button>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Page {i + 1}
@@ -169,6 +173,7 @@ export function ScanView({
                 )}
               </p>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                <button type="button" disabled={pages.length < 2} {...reorder.handle(page.id)} aria-label={`Move page ${i + 1}`} aria-pressed={reorder.movingId === page.id} className="inline-flex min-h-11 touch-none items-center rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 font-semibold disabled:opacity-40">Move</button>
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className={link} aria-label={`Move page ${i + 1} earlier`}>
                   ↑
                 </button>

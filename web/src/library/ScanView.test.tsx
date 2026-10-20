@@ -107,6 +107,33 @@ describe('ScanView', () => {
     await waitFor(async () => expect(await pageOrder(store, scan.id)).toEqual(['b', 'c', 'a']))
   })
 
+  it('moves a page directly across several positions and persists it', async () => {
+    const { store, scan } = await openScan(['a', 'b', 'c', 'd', 'e'])
+    fireEvent.click(btn('Move page 1'))
+    expect(btn('Move page 1').getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(btn('Place page 1 at position 5'))
+    await waitFor(async () => expect(await pageOrder(store, scan.id)).toEqual(['b', 'c', 'd', 'e', 'a']))
+    expect(screen.queryByRole('button', { name: 'Place page 1 at position 5' })).toBeNull()
+  })
+
+  it('accepts a pointer drag onto a distant page', async () => {
+    const { store, scan } = await openScan(['a', 'b', 'c', 'd'])
+    const handle = btn('Move page 1')
+    const target = btn('Review page 4').closest('li')!
+    Object.defineProperty(handle, 'setPointerCapture', { value: vi.fn() })
+    const previous = Object.getOwnPropertyDescriptor(document, 'elementFromPoint')
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => target })
+    try {
+      fireEvent.pointerDown(handle, { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10 })
+      fireEvent.pointerMove(handle, { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 100 })
+      fireEvent.pointerUp(handle, { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 100 })
+    } finally {
+      if (previous) Object.defineProperty(document, 'elementFromPoint', previous)
+      else Reflect.deleteProperty(document, 'elementFromPoint')
+    }
+    await waitFor(async () => expect(await pageOrder(store, scan.id)).toEqual(['b', 'c', 'd', 'a']))
+  })
+
   it('removes a page from the scan', async () => {
     const { store, scan } = await openScan()
     fireEvent.click(btn('Remove page 2'))
@@ -135,18 +162,19 @@ describe('ScanView', () => {
     // Under jsdom, Blobs read back from fake-indexeddb lose their contents (the store tests, in
     // Node, check contents survive). Hand back the original Blobs so the order is checked by identity.
     let originals: Blob[] = []
-    await openScan(['a', 'b'], { exporter }, (store, inputs) => {
+    await openScan(['a', 'b', 'c', 'd'], { exporter }, (store, inputs) => {
       originals = inputs.map((p) => p.blob)
       const getPages = store.getPages.bind(store)
       vi.spyOn(store, 'getPages').mockImplementation(async (id) =>
         (await getPages(id)).map((p) => ({ ...p, blob: inputs.find((i) => i.id === p.id)!.blob })),
       )
     })
-    fireEvent.click(btn('Move page 1 later'))
+    fireEvent.click(btn('Move page 1'))
+    fireEvent.click(btn('Place page 1 at position 4'))
     fireEvent.click(btn(/^(Share|Download) PDF$/))
     await waitFor(() => expect(exporter).toHaveBeenCalled())
     const [blobs, paper, quality] = exporter.mock.calls[0]
-    expect(blobs).toEqual([originals[1], originals[0]])
+    expect(blobs).toEqual([originals[1], originals[2], originals[3], originals[0]])
     expect((blobs as Blob[])[0]).toBe(originals[1])
     expect([paper, quality]).toEqual(['a4', 'balanced'])
   })

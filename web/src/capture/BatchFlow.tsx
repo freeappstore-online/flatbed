@@ -6,8 +6,9 @@ import { FILTERS } from '../filters/filters'
 import { filterBlob } from '../filters/render'
 import { FullScreen } from '../ui/FullScreen'
 import { PageReview } from '../ui/PageReview'
+import { usePageReorder } from '../ui/usePageReorder'
 import { Capture } from './Capture'
-import { type Page, releasePages, uncropped, unfiltered } from './camera'
+import { type Page, movePage, releasePages, uncropped, unfiltered } from './camera'
 
 type Edit = { id: string; kind: 'crop' | 'filter' }
 
@@ -31,6 +32,10 @@ export function BatchFlow({
   const [reviewing, setReviewing] = useState<string | null>(null)
   const held = useRef<Page[]>([])
   const active = useRef(true)
+  const reorder = usePageReorder(pages.map((page) => page.id), (from, to) => {
+    held.current = movePage(held.current, from, to - from)
+    setPages(held.current)
+  }, processing || saving)
 
   useEffect(() => {
     active.current = true
@@ -152,14 +157,17 @@ export function BatchFlow({
         {processing && <p role="status" className="mt-2 text-sm">Straightening captured pages…</p>}
         {error && <p role="alert" className="mt-2 text-sm text-red-300">{error}</p>}
         {pages.length === 0 && <p className="mt-4 text-sm text-white/75">No pages left. Add a page to continue.</p>}
-        <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {pages.length > 1 && <p className="mt-2 text-sm text-white/75">Drag a Move handle, or choose Move and then tap a destination page.</p>}
+        {reorder.movingId && <p role="status" className="mt-2 text-sm">Choose the new position for page {reorder.movingNumber}. Tap a page thumbnail, or choose Move again to cancel.</p>}
+        <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3" onDragStart={(event) => event.preventDefault()}>
           {pages.map((page, index) => (
-            <li key={page.id} className="rounded-lg border border-white/25 p-2">
-              <button type="button" disabled={processing || saving} onClick={() => setReviewing(page.id)} aria-label={`Review page ${index + 1}`} className="block w-full rounded disabled:opacity-40">
-                <img src={page.url} alt={`Page ${index + 1}`} className="aspect-[3/4] w-full rounded bg-white/10 object-contain" />
+            <li key={page.id} data-reorder-id={page.id} className={`rounded-lg border border-white/25 p-2 ${reorder.target === page.id ? 'ring-2 ring-white' : ''} ${reorder.dragging === page.id ? 'opacity-60' : ''}`}>
+              <button type="button" disabled={processing || saving} onClick={() => { if (!reorder.choose(page.id)) setReviewing(page.id) }} aria-label={reorder.movingId ? `Place page ${reorder.movingNumber} at position ${index + 1}` : `Review page ${index + 1}`} className="block w-full rounded disabled:opacity-40">
+                <img src={page.url} alt={`Page ${index + 1}`} draggable={false} className="aspect-[3/4] w-full rounded bg-white/10 object-contain" />
               </button>
               <p className="mt-2 text-sm">Page {index + 1} · {page.crop ? 'Auto-cropped' : 'Needs crop check'}{page.filter && page.filter !== 'original' ? ` · ${FILTERS.find((f) => f.id === page.filter)?.name}` : ''}</p>
               <div className="mt-2 flex flex-wrap gap-2 text-sm">
+                <button type="button" disabled={processing || saving || pages.length < 2} {...reorder.handle(page.id)} aria-label={`Move page ${index + 1}`} aria-pressed={reorder.movingId === page.id} className="min-h-11 touch-none rounded-full bg-white/15 px-3 font-semibold disabled:opacity-40">Move</button>
                 <button type="button" disabled={processing || saving} onClick={() => setEdit({ id: page.id, kind: 'crop' })} className="underline disabled:opacity-40" aria-label={`Crop page ${index + 1}`}>Crop</button>
                 <button type="button" disabled={processing || saving} onClick={() => setEdit({ id: page.id, kind: 'filter' })} className="underline disabled:opacity-40" aria-label={`Filter page ${index + 1}`}>Filter</button>
                 <button type="button" disabled={processing || saving} onClick={() => remove(page.id)} className="underline disabled:opacity-40" aria-label={`Remove page ${index + 1}`}>Remove</button>
