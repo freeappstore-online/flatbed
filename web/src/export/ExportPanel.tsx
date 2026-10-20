@@ -52,7 +52,7 @@ export function ExportPanel({
     }
   }
 
-  const segment = (selected: boolean) =>
+  const optionClass = (selected: boolean) =>
     `rounded-[var(--radius-sm)] border px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
       selected
         ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
@@ -73,7 +73,7 @@ export function ExportPanel({
               aria-pressed={paper === p.id}
               disabled={working}
               onClick={() => setPaper(p.id)}
-              className={segment(paper === p.id)}
+              className={optionClass(paper === p.id)}
             >
               {p.name}
             </button>
@@ -87,7 +87,7 @@ export function ExportPanel({
               aria-pressed={quality === q.id}
               disabled={working}
               onClick={() => setQuality(q.id)}
-              className={segment(quality === q.id)}
+              className={optionClass(quality === q.id)}
             >
               {q.name}
             </button>

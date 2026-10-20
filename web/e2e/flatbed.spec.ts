@@ -43,6 +43,14 @@ async function cornerAt(page: Page, name: string) {
   return { x: (left / 100) * FRAME.width, y: (top / 100) * FRAME.height }
 }
 
+test('automatically captures a page held steady in the viewfinder', async ({ page }) => {
+  await useFakeCamera(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New scan' }).click()
+  await expect(dialog(page, 'Capture pages').getByRole('button', { name: 'Auto capture on' })).toBeVisible()
+  await expect(dialog(page, 'Crop page 1')).toBeVisible({ timeout: 15_000 })
+})
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
     test.use({ colorScheme })
@@ -59,6 +67,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'New scan' }).click()
       const camera = dialog(page, 'Capture pages')
       await expect(camera.getByRole('button', { name: 'Take photo' })).toBeEnabled()
+      // This journey exercises the manual shutter; keep auto capture for its own test.
+      await camera.getByRole('button', { name: 'Auto capture on' }).click()
       await expect(camera).toHaveCSS('background-color', 'rgb(0, 0, 0)') // dark in either theme
       await expectAccessible(page, 'the camera')
       await camera.getByRole('button', { name: 'Multi-page' }).click()

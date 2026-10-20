@@ -11,6 +11,7 @@ import {
 } from './camera'
 import { FullScreen } from '../ui/FullScreen'
 import { DETECT_SIDE, detectQuad } from '../crop/edges'
+import { autoCapture } from './auto'
 
 type Camera = { kind: 'starting' } | { kind: 'live' } | { kind: 'problem'; problem: CameraProblem }
 
@@ -48,6 +49,7 @@ export function Capture({
   const [camera, setCamera] = useState<Camera>({ kind: 'starting' })
   const [attempt, setAttempt] = useState(0)
   const [multi, setMulti] = useState(false)
+  const [automatic, setAutomatic] = useState(true)
   const [pages, setPages] = useState<Page[]>([])
   const [notice, setNotice] = useState('')
   const [flash, setFlash] = useState(false)
@@ -55,6 +57,8 @@ export function Capture({
   const video = useRef<HTMLVideoElement>(null)
   const overlay = useRef<HTMLCanvasElement>(null)
   const stopDetection = useRef<() => void>(() => {})
+  const auto = useRef(autoCapture())
+  const shootRef = useRef<() => Promise<void>>(async () => {})
   const [detectionRun, setDetectionRun] = useState(0)
   const picker = useRef<HTMLInputElement>(null)
   const shutter = useRef<HTMLButtonElement>(null)
@@ -106,7 +110,10 @@ export function Capture({
       context ??= canvas.getContext('2d')
       if (!context) return
       context.clearRect(0, 0, width, height)
-      if (v.readyState < 2 || !v.videoWidth || !v.videoHeight || shooting.current || document.hidden) return
+      if (v.readyState < 2 || !v.videoWidth || !v.videoHeight || shooting.current || document.hidden) {
+        auto.current.observe(null, performance.now())
+        return
+      }
       input ??= sample.getContext('2d', { willReadFrequently: true })
       if (!input) return
       const ratio = DETECT_SIDE / Math.max(v.videoWidth, v.videoHeight)
@@ -117,7 +124,10 @@ export function Capture({
       try {
         input.drawImage(v, 0, 0, sw, sh)
         const quad = detectQuad(input.getImageData(0, 0, sw, sh))
-        if (!quad) return
+        if (!quad) {
+          auto.current.observe(null, performance.now())
+          return
+        }
         // object-contain centers the image inside the video's element box.
         const fit = Math.min(width / v.videoWidth, height / v.videoHeight)
         const imageWidth = v.videoWidth * fit
@@ -136,6 +146,7 @@ export function Capture({
         context.stroke()
         context.fillStyle = 'rgba(0,200,100,0.85)'
         points.forEach((p) => context!.fillRect(p.x - 4, p.y - 4, 8, 8))
+        if (automatic && auto.current.observe(quad, performance.now())) void shootRef.current()
       } catch {
         // A camera frame can become unavailable while the stream changes.
         context.clearRect(0, 0, width, height)
@@ -148,7 +159,7 @@ export function Capture({
     }
     stopDetection.current = stop
     return stop
-  }, [camera.kind, detectionRun])
+  }, [camera.kind, detectionRun, automatic])
 
   // Escape leaves.
   useEffect(() => {
@@ -194,6 +205,7 @@ export function Capture({
     try {
       const blob = await snap(v)
       if (!blob) return setNotice('The camera is still starting. Try again in a moment.')
+      auto.current.captured()
       navigator.vibrate?.(30)
       setFlash(true)
       setTimeout(() => setFlash(false), 150)
@@ -210,6 +222,7 @@ export function Capture({
       if (resume) setDetectionRun((run) => run + 1)
     }
   }
+  shootRef.current = shoot
 
   const imported = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
@@ -322,6 +335,22 @@ export function Capture({
       )}
 
       <div className="flex flex-col gap-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {camera.kind === 'live' && (
+          <button
+            type="button"
+            aria-pressed={automatic}
+            onClick={() => {
+              auto.current = autoCapture()
+              setAutomatic((enabled) => !enabled)
+            }}
+            className="mx-auto rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold"
+          >
+            Auto capture {automatic ? 'on' : 'off'}
+          </button>
+        )}
+        {automatic && camera.kind === 'live' && (
+          <p className="text-center text-xs text-white/75">Hold the page steady to scan automatically. Move it out of view before the next page.</p>
+        )}
         {!singlePage && <div className="mx-auto flex rounded-full bg-white/15 p-1 text-sm font-semibold" role="group" aria-label="Pages">
           {[false, true].map((m) => (
             <button

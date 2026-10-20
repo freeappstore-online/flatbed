@@ -83,3 +83,23 @@ it('skips frames with zero display dimensions', async () => {
   expect(context.drawImage).not.toHaveBeenCalled()
   expect(detectQuad).not.toHaveBeenCalled()
 })
+
+it('takes a steady page automatically once and leaves manual capture available', async () => {
+  const { snap } = await viewfinder(400, 400)
+  expect(screen.getByRole('button', { name: 'Auto capture on' }).getAttribute('aria-pressed')).toBe('true')
+  vi.mocked(detectQuad).mockReturnValue(null)
+  await act(async () => { vi.advanceTimersByTime(300) })
+  vi.mocked(detectQuad).mockReturnValue([
+    { x: 90, y: 45 }, { x: 270, y: 45 }, { x: 270, y: 135 }, { x: 90, y: 135 },
+  ])
+  await act(async () => { vi.advanceTimersByTime(900) })
+  expect(snap).toHaveBeenCalledTimes(2) // first shot starts the test viewfinder
+  await act(async () => { vi.advanceTimersByTime(1000) })
+  expect(snap).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Auto capture on' }))
+  expect(screen.getByRole('button', { name: 'Auto capture off' }).getAttribute('aria-pressed')).toBe('false')
+  await act(async () => { vi.advanceTimersByTime(900) })
+  expect(snap).toHaveBeenCalledTimes(2)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Take photo' })) })
+  expect(snap).toHaveBeenCalledTimes(3)
+})
