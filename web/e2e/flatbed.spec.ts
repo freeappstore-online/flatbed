@@ -200,6 +200,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await camera.getByRole('button', { name: 'Done' }).click()
       const review = dialog(page, 'Review pages')
       await expect(review.getByRole('img', { name: 'Page 2' })).toBeVisible()
+      await review.getByRole('button', { name: 'Review page 2' }).click()
+      const batchPage = dialog(page, 'Review page 2')
+      await expect(batchPage.getByRole('img', { name: 'Page 2 full-size preview' })).toBeVisible()
+      await expect(batchPage.getByRole('button', { name: 'Next page' })).toBeDisabled()
+      await batchPage.getByRole('button', { name: 'Close review' }).click()
       await review.getByRole('button', { name: 'Add pages' }).click()
       await camera.getByRole('button', { name: 'Auto capture on' }).click()
       await camera.getByRole('button', { name: 'Take photo' }).click()
@@ -223,6 +228,26 @@ for (const colorScheme of ['light', 'dark'] as const) {
       expect(beforeSave).toBe(0)
       await review.getByRole('button', { name: 'Save scan' }).click()
       await expect(page.getByRole('heading', { name: '3 pages' })).toBeVisible()
+
+      // Inspect saved pages at full size before exporting; navigation does not reorder them.
+      await page.getByRole('button', { name: 'Review page 2' }).click()
+      const pageReview = dialog(page, 'Review page 2')
+      await expect(pageReview.getByRole('img', { name: 'Page 2 full-size preview' })).toBeVisible()
+      await expect(pageReview.getByRole('button', { name: 'Crop page 2' })).toBeVisible()
+      await expect(pageReview.getByRole('button', { name: 'Filter page 2' })).toBeVisible()
+      await expect(pageReview.getByRole('button', { name: 'Retake page 2' })).toBeVisible()
+      await expect(pageReview.getByRole('button', { name: 'Remove page 2' })).toBeVisible()
+      await pageReview.getByRole('button', { name: 'Zoom in' }).click()
+      await expect(pageReview.getByRole('status')).toHaveText('150%')
+      await pageReview.getByRole('button', { name: 'Next page' }).click()
+      await expect(dialog(page, 'Review page 3').getByRole('status')).toHaveText('100%')
+      await page.keyboard.press('ArrowLeft')
+      await expect(dialog(page, 'Review page 2')).toBeVisible()
+      await dialog(page, 'Review page 2').getByLabel('Page 2 image; pinch or double tap to zoom').dblclick()
+      await expect(dialog(page, 'Review page 2').getByRole('status')).toHaveText('250%')
+      await expectAccessible(page, 'full-page review')
+      await page.keyboard.press('Escape')
+      await expect(dialog(page, 'Review page 2')).toHaveCount(0)
 
       // Retake just the middle page. Cancellation preserves every image.
       const savedPages = () => page.evaluate(async () => {

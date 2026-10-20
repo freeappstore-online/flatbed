@@ -8,6 +8,7 @@ import { ExportPanel } from '../export/ExportPanel'
 import { FilterEditor } from '../filters/FilterEditor'
 import { FILTERS, type Filter } from '../filters/filters'
 import { filterBlob } from '../filters/render'
+import { PageReview } from '../ui/PageReview'
 import { toInput, toPage } from './scans'
 import type { Scan, ScanStore } from './store'
 
@@ -45,6 +46,7 @@ export function ScanView({
   const [lastFilter, setLastFilter] = useState<Filter>('original')
   const [capturing, setCapturing] = useState(false)
   const [retaking, setRetaking] = useState<string | null>(null)
+  const [reviewing, setReviewing] = useState<string | null>(null)
   const [error, setError] = useState('')
   const held = useRef(pages)
   held.current = pages
@@ -157,7 +159,9 @@ export function ScanView({
         <ol className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {pages.map((page, i) => (
             <li key={page.id} className="rounded-[var(--radius)] border border-[var(--line)] p-2">
-              <img src={page.url} alt={`Page ${i + 1}`} className="aspect-[3/4] w-full rounded object-cover" />
+              <button type="button" onClick={() => setReviewing(page.id)} aria-label={`Review page ${i + 1}`} className="block w-full rounded">
+                <img src={page.url} alt={`Page ${i + 1}`} className="aspect-[3/4] w-full rounded object-cover" />
+              </button>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Page {i + 1}
                 {page.filter && page.filter !== 'original' && (
@@ -192,6 +196,19 @@ export function ScanView({
       <ExportPanel pages={pages.map((p) => p.blob)} name={scan.name} exporter={exporter} />
 
       <DeleteScan name={scan.name} pages={pages.length} onDelete={async () => (await save(() => store.deleteScan(scanId))) && onClose()} />
+
+      {reviewing && pages.some((page) => page.id === reviewing) && (
+        <PageReview
+          pages={pages}
+          pageId={reviewing}
+          onPageChange={setReviewing}
+          onClose={() => setReviewing(null)}
+          onCrop={(id) => { setReviewing(null); setSteps([{ id, kind: 'crop' }]) }}
+          onFilter={(id) => { setReviewing(null); setSteps([{ id, kind: 'filter' }]) }}
+          onRetake={(id) => { setReviewing(null); setRetaking(id) }}
+          onRemove={(id) => { setReviewing(null); remove(id) }}
+        />
+      )}
 
       {capturing && (
         <BatchFlow

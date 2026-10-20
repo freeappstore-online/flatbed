@@ -5,6 +5,7 @@ import { FilterEditor } from '../filters/FilterEditor'
 import { FILTERS } from '../filters/filters'
 import { filterBlob } from '../filters/render'
 import { FullScreen } from '../ui/FullScreen'
+import { PageReview } from '../ui/PageReview'
 import { Capture } from './Capture'
 import { type Page, releasePages, uncropped, unfiltered } from './camera'
 
@@ -27,6 +28,7 @@ export function BatchFlow({
   const [error, setError] = useState('')
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [edit, setEdit] = useState<Edit | null>(null)
+  const [reviewing, setReviewing] = useState<string | null>(null)
   const held = useRef<Page[]>([])
   const active = useRef(true)
 
@@ -116,6 +118,17 @@ export function BatchFlow({
   if (stage === 'capture') return (
     <Capture onDone={captured} onCancel={() => pages.length ? setStage('review') : onCancel()} />
   )
+  if (reviewing && pages.some((page) => page.id === reviewing)) return (
+    <PageReview
+      pages={pages}
+      pageId={reviewing}
+      onPageChange={setReviewing}
+      onClose={() => setReviewing(null)}
+      onCrop={(id) => { setReviewing(null); setEdit({ id, kind: 'crop' }) }}
+      onFilter={(id) => { setReviewing(null); setEdit({ id, kind: 'filter' }) }}
+      onRemove={(id) => { setReviewing(null); remove(id) }}
+    />
+  )
 
   return (
     <FullScreen label="Review pages">
@@ -141,7 +154,9 @@ export function BatchFlow({
         <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {pages.map((page, index) => (
             <li key={page.id} className="rounded-lg border border-white/25 p-2">
-              <img src={page.url} alt={`Page ${index + 1}`} className="aspect-[3/4] w-full rounded bg-white/10 object-contain" />
+              <button type="button" disabled={processing || saving} onClick={() => setReviewing(page.id)} aria-label={`Review page ${index + 1}`} className="block w-full rounded disabled:opacity-40">
+                <img src={page.url} alt={`Page ${index + 1}`} className="aspect-[3/4] w-full rounded bg-white/10 object-contain" />
+              </button>
               <p className="mt-2 text-sm">Page {index + 1} · {page.crop ? 'Auto-cropped' : 'Needs crop check'}{page.filter && page.filter !== 'original' ? ` · ${FILTERS.find((f) => f.id === page.filter)?.name}` : ''}</p>
               <div className="mt-2 flex flex-wrap gap-2 text-sm">
                 <button type="button" disabled={processing || saving} onClick={() => setEdit({ id: page.id, kind: 'crop' })} className="underline disabled:opacity-40" aria-label={`Crop page ${index + 1}`}>Crop</button>
