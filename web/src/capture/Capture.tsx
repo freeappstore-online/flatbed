@@ -333,7 +333,7 @@ export function Capture({
   return (
     <FullScreen label="Capture pages">
       <div className="flex items-center justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button type="button" onClick={cancel} className="rounded-full bg-white/15 px-4 py-2 text-sm font-semibold">
+        <button type="button" onClick={cancel} className="rounded-full bg-capture-ink/15 px-4 py-2 text-sm font-semibold">
           {confirmDiscard ? `Discard ${count} ${count === 1 ? 'page' : 'pages'}?` : 'Cancel'}
         </button>
         {multi && count > 0 && (
@@ -361,13 +361,13 @@ export function Capture({
               className="pointer-events-none absolute inset-0 h-full w-full"
             />
             {camera.kind === 'starting' && (
-              <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-white/80">Starting the camera…</p>
+              <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-capture-ink/80">Starting the camera…</p>
             )}
-            {flash && <div aria-hidden className="pointer-events-none absolute inset-0 bg-white/70 motion-reduce:hidden" />}
+            {flash && <div aria-hidden className="pointer-events-none absolute inset-0 bg-capture-ink/70 motion-reduce:hidden" />}
           </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-            <p role="alert" className="max-w-sm text-white/90">
+            <p role="alert" className="max-w-sm text-capture-ink/90">
               {PROBLEM_TEXT[camera.problem]}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -375,7 +375,7 @@ export function Capture({
                 <button
                   type="button"
                   onClick={() => setAttempt((n) => n + 1)}
-                  className="rounded-full bg-white/15 px-4 py-2 font-semibold"
+                  className="rounded-full bg-capture-ink/15 px-4 py-2 font-semibold"
                 >
                   Try again
                 </button>
@@ -383,7 +383,7 @@ export function Capture({
               <button
                 type="button"
                 onClick={() => picker.current?.click()}
-                className="rounded-full bg-white px-4 py-2 font-semibold text-black"
+                className="rounded-full bg-capture-ink px-4 py-2 font-semibold text-capture-paper"
               >
                 Import photos
               </button>
@@ -393,11 +393,11 @@ export function Capture({
       </div>
 
       {notice && (
-        <p role="status" className="px-4 pt-2 text-center text-sm text-white/90">
+        <p role="status" className="px-4 pt-2 text-center text-sm text-capture-ink/90">
           {notice}
         </p>
       )}
-      {draftError && <p role="alert" className="px-4 pt-2 text-center text-sm text-red-300">{draftError}</p>}
+      {draftError && <p role="alert" className="px-4 pt-2 text-center text-sm text-capture-danger">{draftError}</p>}
 
       {multi && count > 0 && (
         <ol className="flex gap-2 overflow-x-auto px-3 pt-3" aria-label="Captured pages">
@@ -408,7 +408,7 @@ export function Capture({
                 type="button"
                 onClick={() => remove(page.id)}
                 aria-label={`Remove page ${i + 1}`}
-                className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-black/80 text-sm leading-none"
+                className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-capture-paper/80 text-sm leading-none"
               >
                 ×
               </button>
@@ -427,7 +427,7 @@ export function Capture({
                 auto.current = autoCapture()
                 setAutomatic((enabled) => !enabled)
               }}
-              className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold"
+              className="rounded-full bg-capture-ink/15 px-4 py-1.5 text-sm font-semibold"
             >
               Auto capture {automatic ? 'on' : 'off'}
             </button>
@@ -437,18 +437,18 @@ export function Capture({
                 aria-pressed={torchOn}
                 disabled={torchBusy}
                 onClick={toggleTorch}
-                className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+                className="rounded-full bg-capture-ink/15 px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
               >
                 Torch {torchOn ? 'on' : 'off'}
               </button>
             )}
           </div>
         )}
-        {torchError && <p role="alert" className="text-center text-sm text-red-300">{torchError}</p>}
+        {torchError && <p role="alert" className="text-center text-sm text-capture-danger">{torchError}</p>}
         {automatic && camera.kind === 'live' && (
-          <p className="text-center text-xs text-white/75">Hold the page steady to scan automatically. Move it out of view before the next page.</p>
+          <p className="text-center text-xs text-capture-ink/75">Hold the page steady to scan automatically. Move it out of view before the next page.</p>
         )}
-        {!singlePage && <div className="mx-auto flex rounded-full bg-white/15 p-1 text-sm font-semibold" role="group" aria-label="Pages">
+        {!singlePage && <div className="mx-auto flex rounded-full bg-capture-ink/15 p-1 text-sm font-semibold" role="group" aria-label="Pages">
           {[false, true].map((m) => (
             <button
               key={String(m)}
@@ -456,7 +456,7 @@ export function Capture({
               aria-pressed={multi === m}
               disabled={!m && count > 0}
               onClick={() => setMulti(m)}
-              className={`rounded-full px-4 py-1.5 disabled:opacity-40 ${multi === m ? 'bg-white text-black' : ''}`}
+              className={`rounded-full px-4 py-1.5 disabled:opacity-40 ${multi === m ? 'bg-capture-ink text-capture-paper' : ''}`}
             >
               {m ? 'Multi-page' : 'Single page'}
             </button>
@@ -466,7 +466,7 @@ export function Capture({
           <button
             type="button"
             onClick={() => picker.current?.click()}
-            className="justify-self-start rounded-full bg-white/15 px-4 py-3 text-sm font-semibold"
+            className="justify-self-start rounded-full bg-capture-ink/15 px-4 py-3 text-sm font-semibold"
           >
             Import
           </button>
@@ -476,14 +476,14 @@ export function Capture({
             onClick={shoot}
             disabled={camera.kind !== 'live'}
             aria-label="Take photo"
-            className="h-18 w-18 justify-self-center rounded-full border-4 border-white bg-white/90 ring-4 ring-black transition active:scale-95 disabled:opacity-40"
+            className="h-18 w-18 justify-self-center rounded-full border-4 border-capture-ink bg-capture-ink/90 ring-4 ring-capture-paper transition active:scale-95 disabled:opacity-40"
           />
           {multi && (
             <button
               type="button"
               onClick={() => finish(pages)}
               disabled={count === 0}
-              className="justify-self-end rounded-full bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-40"
+              className="justify-self-end rounded-full bg-capture-ink px-4 py-3 text-sm font-semibold text-capture-paper disabled:opacity-40"
             >
               Done
             </button>

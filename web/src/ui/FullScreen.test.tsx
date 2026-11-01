@@ -42,7 +42,7 @@ describe('FullScreen', () => {
 
   it('stays dark whatever the theme', () => {
     render(<Page open />)
-    expect(screen.getByRole('dialog').className).toMatch(/bg-black/)
+    expect(screen.getByRole('dialog').className).toMatch(/bg-capture-paper/)
     expect(screen.getByRole('dialog').className).toMatch(/\[color-scheme:dark\]/)
   })
 })

@@ -35,7 +35,7 @@ export function FullScreen({ label, children }: { label: string; children: React
       aria-modal="true"
       aria-label={label}
       tabIndex={-1}
-      className="fixed inset-0 z-50 flex flex-col bg-black text-white outline-none [color-scheme:dark]"
+      className="fixed inset-0 z-50 flex flex-col bg-capture-paper text-capture-ink outline-none [color-scheme:dark]"
     >
       {children}
     </div>,

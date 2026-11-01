@@ -50,7 +50,7 @@ function Thumb({ thumb, filter, adjustments, selected }: { thumb: Pixels | null;
     <canvas
       ref={canvas}
       aria-hidden
-      className={`h-20 w-16 rounded bg-white/10 object-contain ${selected ? 'ring-3 ring-[var(--accent)]' : ''}`}
+      className={`h-20 w-16 rounded bg-capture-ink/10 object-contain ${selected ? 'ring-3 ring-accent' : ''}`}
     />
   )
 }

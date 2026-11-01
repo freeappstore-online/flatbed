@@ -142,7 +142,7 @@ export function PageReview({ pages, pageId, onPageChange, onClose, onCrop, onFil
     lastTap.current = null
   }
 
-  const button = 'rounded-full bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
+  const button = 'rounded-full bg-capture-ink/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
   return (
     <FullScreen label={`Review page ${number}`}>
       <div className="flex items-center justify-between gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -152,8 +152,7 @@ export function PageReview({ pages, pageId, onPageChange, onClose, onCrop, onFil
       <div
         ref={viewport}
         aria-label={`Page ${number} image; pinch or double tap to zoom`}
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-neutral-950"
-        style={{ touchAction: 'none' }}
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-capture-panel touch-none"
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}

@@ -3,12 +3,12 @@ export function PrivacyNote() {
   return (
     <section
       aria-labelledby="privacy-heading"
-      className="mt-6 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-4"
+      className="mt-6 rounded-fas border border-line bg-panel p-4"
     >
-      <h2 id="privacy-heading" className="font-semibold text-[var(--ink)]">
+      <h2 id="privacy-heading" className="font-semibold text-ink">
         Privacy: your scans stay on this device
       </h2>
-      <ul className="mt-2 grid list-disc gap-2 pl-5 text-sm text-[var(--muted)]">
+      <ul className="mt-2 grid list-disc gap-2 pl-5 text-sm text-muted">
         <li>
           Photos, cropped pages and PDFs are made on this device. Images and PDFs never leave it: nothing is
           uploaded, and there's no server-side processing. A PDF goes only where you share or save it.

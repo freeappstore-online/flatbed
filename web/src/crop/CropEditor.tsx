@@ -172,7 +172,7 @@ export function CropEditor({
     const r = rect(w, h)[i]
     return p.x === r.x && p.y === r.y
   })
-  const button = 'rounded-full bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
+  const button = 'rounded-full bg-capture-ink/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
 
   return (
     <FullScreen label={title}>
@@ -184,9 +184,9 @@ export function CropEditor({
       </div>
 
       <div ref={area} className="relative flex min-h-0 flex-1 items-center justify-center p-6">
-        {state.kind === 'loading' && <p className="text-white/80">Finding the page…</p>}
+        {state.kind === 'loading' && <p className="text-capture-ink/80">Finding the page…</p>}
         {state.kind === 'failed' && (
-          <p role="alert" className="max-w-sm text-center text-white/90">
+          <p role="alert" className="max-w-sm text-center text-capture-ink/90">
             Couldn't open this image, so it can't be cropped. Keep it as it is, or remove it and import it as a JPEG or PNG.
           </p>
         )}
@@ -231,7 +231,7 @@ export function CropEditor({
                 onPointerCancel={onHandleUp}
                 onKeyDown={onHandleKey(i)}
               >
-                <span className="h-5 w-5 rounded-full border-2 border-white bg-[var(--accent)] shadow" />
+                <span className="h-5 w-5 rounded-full border-2 border-capture-ink bg-accent shadow" />
               </button>
             ))}
           </div>
@@ -241,7 +241,7 @@ export function CropEditor({
       <p id="corner-hint" className="sr-only">
         Drag the corner onto the corner of the page, or move it with the arrow keys (Shift for bigger steps).
       </p>
-      <p className="px-4 text-center text-sm text-white/90" aria-live="polite">
+      <p className="px-4 text-center text-sm text-capture-ink/90" aria-live="polite">
         {working
           ? 'Straightening…'
           : error ||
@@ -280,9 +280,9 @@ export function CropEditor({
               ref={preview}
               aria-label="Preview of the straightened page"
               role="img"
-              className="max-h-20 max-w-20 rounded bg-white/10"
+              className="max-h-20 max-w-20 rounded bg-capture-ink/10"
             />
-            <figcaption className="text-xs text-white/70">
+            <figcaption className="text-xs text-capture-ink/70">
               Preview{turns ? `, turned ${turns * 90}°` : ''}
             </figcaption>
           </figure>
@@ -291,7 +291,7 @@ export function CropEditor({
             type="button"
             onClick={apply}
             disabled={!picture || !valid || working}
-            className="rounded-full bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
+            className="rounded-full bg-capture-ink px-6 py-3 font-semibold text-capture-paper disabled:opacity-40"
           >
             Done
           </button>

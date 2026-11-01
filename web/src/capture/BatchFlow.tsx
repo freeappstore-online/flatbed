@@ -186,28 +186,28 @@ export function BatchFlow({
             else setConfirmDiscard(true)
           }}
           disabled={saving || processing}
-          className="rounded-full bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+          className="rounded-full bg-capture-ink/15 px-4 py-2 text-sm font-semibold disabled:opacity-40"
         >
           {confirmDiscard ? 'Discard pages?' : 'Cancel'}
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4">
-        <p className="text-sm text-white/75">Check each page. Adjust only those that need it, then save the batch.</p>
+        <p className="text-sm text-capture-ink/75">Check each page. Adjust only those that need it, then save the batch.</p>
         {processing && <p role="status" className="mt-2 text-sm">Straightening captured pages…</p>}
-        {error && <p role="alert" className="mt-2 text-sm text-red-300">{error}</p>}
-        {draftError && <p role="alert" className="mt-2 text-sm text-red-300">{draftError}</p>}
-        {pages.length === 0 && <p className="mt-4 text-sm text-white/75">No pages left. Add a page to continue.</p>}
-        {pages.length > 1 && <p className="mt-2 text-sm text-white/75">Drag a Move handle, or choose Move and then tap a destination page.</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-capture-danger">{error}</p>}
+        {draftError && <p role="alert" className="mt-2 text-sm text-capture-danger">{draftError}</p>}
+        {pages.length === 0 && <p className="mt-4 text-sm text-capture-ink/75">No pages left. Add a page to continue.</p>}
+        {pages.length > 1 && <p className="mt-2 text-sm text-capture-ink/75">Drag a Move handle, or choose Move and then tap a destination page.</p>}
         {reorder.movingId && <p role="status" className="mt-2 text-sm">Choose the new position for page {reorder.movingNumber}. Tap a page thumbnail, or choose Move again to cancel.</p>}
         <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3" onDragStart={(event) => event.preventDefault()}>
           {pages.map((page, index) => (
-            <li key={page.id} data-reorder-id={page.id} className={`rounded-lg border border-white/25 p-2 ${reorder.target === page.id ? 'ring-2 ring-white' : ''} ${reorder.dragging === page.id ? 'opacity-60' : ''}`}>
+            <li key={page.id} data-reorder-id={page.id} className={`rounded-lg border border-capture-ink/25 p-2 ${reorder.target === page.id ? 'ring-2 ring-capture-ink' : ''} ${reorder.dragging === page.id ? 'opacity-60' : ''}`}>
               <button type="button" disabled={processing || saving} onClick={() => { if (!reorder.choose(page.id)) setReviewing(page.id) }} aria-label={reorder.movingId ? `Place page ${reorder.movingNumber} at position ${index + 1}` : `Review page ${index + 1}`} className="block w-full rounded disabled:opacity-40">
-                <img src={page.url} alt={`Page ${index + 1}`} draggable={false} className="aspect-[3/4] w-full rounded bg-white/10 object-contain" />
+                <img src={page.url} alt={`Page ${index + 1}`} draggable={false} className="aspect-[3/4] w-full rounded bg-capture-ink/10 object-contain" />
               </button>
               <p className="mt-2 text-sm">Page {index + 1} · {page.crop ? 'Auto-cropped' : 'Needs crop check'}{page.filter && page.filter !== 'original' ? ` · ${FILTERS.find((f) => f.id === page.filter)?.name}` : ''}</p>
               <div className="mt-2 flex flex-wrap gap-2 text-sm">
-                <button type="button" disabled={processing || saving || pages.length < 2} {...reorder.handle(page.id)} aria-label={`Move page ${index + 1}`} aria-pressed={reorder.movingId === page.id} className="min-h-11 touch-none rounded-full bg-white/15 px-3 font-semibold disabled:opacity-40">Move</button>
+                <button type="button" disabled={processing || saving || pages.length < 2} {...reorder.handle(page.id)} aria-label={`Move page ${index + 1}`} aria-pressed={reorder.movingId === page.id} className="min-h-11 touch-none rounded-full bg-capture-ink/15 px-3 font-semibold disabled:opacity-40">Move</button>
                 <button type="button" disabled={processing || saving} onClick={() => setEdit({ id: page.id, kind: 'crop' })} className="underline disabled:opacity-40" aria-label={`Crop page ${index + 1}`}>Crop</button>
                 <button type="button" disabled={processing || saving} onClick={() => setEdit({ id: page.id, kind: 'filter' })} className="underline disabled:opacity-40" aria-label={`Filter page ${index + 1}`}>Filter</button>
                 <button type="button" disabled={processing || saving} onClick={() => remove(page.id)} className="underline disabled:opacity-40" aria-label={`Remove page ${index + 1}`}>Remove</button>
@@ -217,8 +217,8 @@ export function BatchFlow({
         </ol>
       </div>
       <div className="flex items-center justify-between gap-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <button type="button" disabled={processing || saving} onClick={() => setStage('capture')} className="rounded-full bg-white/15 px-4 py-3 font-semibold disabled:opacity-40">Add pages</button>
-        <button type="button" disabled={processing || saving || pages.length === 0} onClick={save} className="rounded-full bg-white px-4 py-3 font-semibold text-black disabled:opacity-40">{saving ? 'Saving…' : saveLabel}</button>
+        <button type="button" disabled={processing || saving} onClick={() => setStage('capture')} className="rounded-full bg-capture-ink/15 px-4 py-3 font-semibold disabled:opacity-40">Add pages</button>
+        <button type="button" disabled={processing || saving || pages.length === 0} onClick={save} className="rounded-full bg-capture-ink px-4 py-3 font-semibold text-capture-paper disabled:opacity-40">{saving ? 'Saving…' : saveLabel}</button>
       </div>
     </FullScreen>
   )

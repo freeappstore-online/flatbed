@@ -53,15 +53,15 @@ export function ExportPanel({
   }
 
   const optionClass = (selected: boolean) =>
-    `rounded-[var(--radius-sm)] border px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
+    `rounded-fas-sm border px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
       selected
-        ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
-        : 'border-[var(--line-strong)] text-[var(--ink)] hover:bg-[var(--panel-strong)]'
+        ? 'border-ink bg-ink text-paper'
+        : 'border-line-strong text-ink hover:bg-panel-strong'
     }`
 
   return (
-    <section aria-labelledby="export-heading" className="mt-6 rounded-[var(--radius)] border border-[var(--line)] p-4">
-      <h2 id="export-heading" className="font-semibold text-[var(--ink)]">
+    <section aria-labelledby="export-heading" className="mt-6 rounded-fas border border-line p-4">
+      <h2 id="export-heading" className="font-semibold text-ink">
         Export PDF
       </h2>
       <div className="mt-3 grid gap-3">
@@ -97,12 +97,12 @@ export function ExportPanel({
           type="button"
           onClick={run}
           disabled={working || pages.length === 0}
-          className="rounded-[var(--radius)] bg-[var(--ink)] px-4 py-3 font-semibold text-[var(--paper)] hover:opacity-90 disabled:opacity-50 sm:justify-self-start"
+          className="rounded-fas bg-ink px-4 py-3 font-semibold text-paper hover:opacity-90 disabled:opacity-50 sm:justify-self-start"
         >
           {share ? 'Share PDF' : 'Download PDF'}
         </button>
       </div>
-      <p className="mt-2 text-sm text-[var(--muted)]" aria-live="polite">
+      <p className="mt-2 text-sm text-muted" aria-live="polite">
         {status.kind === 'working' &&
           (status.done < pages.length ? `Making page ${status.done + 1} of ${pages.length}…` : 'Putting the PDF together…')}
         {status.kind === 'finished' &&
@@ -110,7 +110,7 @@ export function ExportPanel({
         {status.kind === 'idle' && 'Made on this device; nothing is uploaded.'}
       </p>
       {status.kind === 'failed' && (
-        <p role="alert" className="mt-1 text-sm text-[var(--danger)]">
+        <p role="alert" className="mt-1 text-sm text-danger">
           Couldn't make the PDF. Try again, or a smaller quality.
         </p>
       )}

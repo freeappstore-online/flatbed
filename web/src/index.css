@@ -1,4 +1,50 @@
 @import "tailwindcss";
+@source "../node_modules/@freeappstore/sdk/dist";
+
+@theme inline {
+  --color-popover: var(--popover);
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-strong: var(--ink-strong);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-panel: var(--panel);
+  --color-panel-strong: var(--panel-strong);
+  --color-panel-quiet: var(--panel-quiet);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-deep: var(--accent-deep);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-accent-hover: var(--accent-hover);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-sky-deep: var(--sky-deep);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-mint-deep: var(--mint-deep);
+  --radius-fas: var(--radius);
+  --radius-fas-sm: var(--radius-sm);
+  --shadow-fas: var(--shadow);
+  --color-bg-start: var(--bg-start);
+  --color-bg-mid: var(--bg-mid);
+  --color-bg-end: var(--bg-end);
+  --color-glow-warm: var(--glow-warm);
+  --color-glow-cool: var(--glow-cool);
+  --color-bg-blob-1: var(--bg-blob-1);
+  --color-bg-blob-2: var(--bg-blob-2);
+  --color-capture-paper: var(--capture-paper);
+  --color-capture-ink: var(--capture-ink);
+  --color-capture-panel: var(--capture-panel);
+  --color-capture-danger: var(--capture-danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-scrim: var(--scrim);
+}
 
 /* Phones held sideways: tighter spacing so screens fit without scrolling. */
 @custom-variant short (@media (max-height: 480px));
@@ -52,9 +98,9 @@
   --muted: #666666;
   --line: rgba(0, 0, 0, 0.08);
   --line-strong: rgba(0, 0, 0, 0.14);
-  --panel: rgba(255, 255, 255, 0.72);
-  --panel-strong: rgba(255, 255, 255, 0.88);
-  --panel-quiet: rgba(255, 255, 255, 0.6);
+  --panel: rgb(255, 255, 255);
+  --panel-strong: rgb(255, 255, 255);
+  --panel-quiet: rgb(255, 255, 255);
   --accent: #d86f4d;
   --accent-soft: #ffd4bf;
   --accent-deep: #9f4427;
@@ -89,6 +135,11 @@
   --radius: 0.75rem;
   --radius-sm: 0.5rem;
   --shadow: var(--shadow-card);
+  --popover: var(--paper);
+  --danger-soft: #fef2f2;
+  --success-soft: #f0fdf4;
+  --warning-soft: #fefce8;
+  --scrim: rgba(15, 23, 42, 0.5);
 }
 
 :root[data-theme='dark'] {
@@ -99,9 +150,9 @@
   --muted: #888888;
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.14);
-  --panel: rgba(18, 18, 18, 0.8);
-  --panel-strong: rgba(18, 18, 18, 0.92);
-  --panel-quiet: rgba(22, 22, 22, 0.8);
+  --panel: rgb(18, 18, 18);
+  --panel-strong: rgb(18, 18, 18);
+  --panel-quiet: rgb(22, 22, 22);
   --accent: #ff9b76;
   --accent-soft: #3b2119;
   --accent-deep: #ffd9cb;
@@ -128,6 +179,11 @@
   --bg-blob-2: rgba(137, 203, 229, 0.05);
   --shadow-soft: 0 28px 70px rgba(0, 0, 0, 0.6);
   --shadow-card: 0 12px 28px rgba(0, 0, 0, 0.4);
+  --popover: var(--paper);
+  --danger-soft: #450a0a;
+  --success-soft: #052e16;
+  --warning-soft: #422006;
+  --scrim: rgba(0, 0, 0, 0.65);
 }
 
 html {
@@ -233,23 +289,25 @@ a:focus-visible {
 } /* end @layer base */
 
 /* Shell's text-size preference scales rem-based app typography. */
-:root[data-text='lg'] { font-size: 112.5%; }
-:root[data-text='sm'] { font-size: 87.5%; }
 
 /* The SDK's Sign in button is white on --accent (3.3:1 light, 2.1:1 dark),
    below WCAG AA for its 14px text. Use the deep accent with paper text instead
    (white on #9f4427, near-black on #ffd9cb). Its colours are inline styles,
    hence !important. */
-header button[style*='--accent'] {
-  background: var(--accent-deep) !important;
-  color: var(--paper) !important;
-  white-space: nowrap;
-}
 
 /* With Sign in kept on one line, the Shell header (Free · Flatbed · menu ·
    text size · theme · Sign in) is ~14px too wide for a 320px phone. Below
    360px, tighten its spacing; layout only, no brand colours. Its styles are
    inline, hence !important. */
+
+@layer components{
+:root[data-text='lg'] { font-size: 112.5%; }
+:root[data-text='sm'] { font-size: 87.5%; }
+header button[style*='--accent'] {
+  background: var(--accent-deep) !important;
+  color: var(--paper) !important;
+  white-space: nowrap;
+}
 @media (max-width: 359px) {
   #root header {
     padding-left: 0.5rem !important;
@@ -261,4 +319,12 @@ header button[style*='--accent'] {
   #root header > div:last-child {
     gap: 0.25rem !important;
   }
+}
+}
+
+:root, :root[data-theme="dark"] {
+  --capture-paper: #000000;
+  --capture-ink: #ffffff;
+  --capture-panel: #0a0a0a;
+  --capture-danger: #fca5a5;
 }

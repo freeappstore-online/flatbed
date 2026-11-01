@@ -39,37 +39,37 @@ export function Library({
         type="button"
         onClick={() => { setResumePages([]); setCapturing(true) }}
         disabled={!draftState || !!draft}
-        className="w-full rounded-[var(--radius)] bg-[var(--ink)] px-4 py-4 text-lg font-semibold text-[var(--paper)] hover:opacity-90 disabled:opacity-40 sm:w-auto short:py-2.5 short:text-base"
+        className="w-full rounded-fas bg-ink px-4 py-4 text-lg font-semibold text-paper hover:opacity-90 disabled:opacity-40 sm:w-auto short:py-2.5 short:text-base"
       >
         New scan
       </button>
 
-      {draftState?.failed && <p role="alert" className="mt-3 text-sm text-[var(--danger)]">Couldn't check for an unfinished scan. You can still capture pages, but they may not be recoverable if this tab closes.</p>}
+      {draftState?.failed && <p role="alert" className="mt-3 text-sm text-danger">Couldn't check for an unfinished scan. You can still capture pages, but they may not be recoverable if this tab closes.</p>}
 
-      {draft && !capturing && <section aria-label="Unfinished scan" className="mt-4 rounded-[var(--radius)] border border-[var(--line-strong)] p-4">
+      {draft && !capturing && <section aria-label="Unfinished scan" className="mt-4 rounded-fas border border-line-strong p-4">
         <h2 className="font-semibold">Unfinished scan</h2>
         <p className="mt-1 text-sm">{draft.pages.length} {draft.pages.length === 1 ? 'page was' : 'pages were'} saved on this device before you left. Resume to continue, or discard these pages.</p>
         <div className="mt-3 flex gap-3">
-          <button type="button" className="rounded-[var(--radius-sm)] bg-[var(--ink)] px-4 py-2 font-semibold text-[var(--paper)]" onClick={() => {
+          <button type="button" className="rounded-fas-sm bg-ink px-4 py-2 font-semibold text-paper" onClick={() => {
             if (draft.kind === 'append' && draft.scanId) onOpen(draft.scanId)
             else { setResumePages(draft.pages.map(draftPage)); setCapturing(true) }
           }}>Resume</button>
-          <button type="button" className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-4 py-2" onClick={async () => {
+          <button type="button" className="rounded-fas-sm border border-line-strong px-4 py-2" onClick={async () => {
             try { setDraftError(''); await store.discardDraft() }
             catch { setDraftError("Couldn't discard the draft. Try again.") }
           }}>Discard</button>
         </div>
-        {draftError && <p role="alert" className="mt-2 text-sm text-[var(--danger)]">{draftError}</p>}
+        {draftError && <p role="alert" className="mt-2 text-sm text-danger">{draftError}</p>}
       </section>}
 
       <section className="mt-6 short:mt-3" aria-labelledby="scans-heading">
-        <h2 id="scans-heading" className="font-semibold text-[var(--ink)]">
+        <h2 id="scans-heading" className="font-semibold text-ink">
           Your scans
         </h2>
         {list === undefined ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">Loading…</p>
+          <p className="mt-2 text-sm text-muted">Loading…</p>
         ) : list.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">No scans yet. Tap New scan to shoot or import your first page.</p>
+          <p className="mt-2 text-sm text-muted">No scans yet. Tap New scan to shoot or import your first page.</p>
         ) : (
           <ul className="mt-3 grid gap-2">
             {list.map((scan) => (
@@ -81,7 +81,7 @@ export function Library({
         )}
       </section>
 
-      <p className="mt-6 text-sm text-[var(--muted)] short:mt-3">
+      <p className="mt-6 text-sm text-muted short:mt-3">
         Scans are kept only in this browser on this device.{' '}
         <button type="button" onClick={onPrivacy} className="underline">
           Privacy
@@ -118,16 +118,16 @@ function ScanRow({ scan, onOpen }: { scan: ScanSummary; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-[var(--radius)] border border-[var(--line)] p-2 text-left hover:bg-[var(--panel-strong)]"
+      className="flex w-full items-center gap-3 rounded-fas border border-line p-2 text-left hover:bg-panel-strong"
     >
       {cover ? (
         <img src={cover} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />
       ) : (
-        <span aria-hidden className="h-16 w-12 shrink-0 rounded bg-[var(--paper-deep)]" />
+        <span aria-hidden className="h-16 w-12 shrink-0 rounded bg-paper-deep" />
       )}
       <span className="min-w-0">
-        <span className="block truncate font-semibold text-[var(--ink)]">{scan.name}</span>
-        <span className="block text-sm text-[var(--muted)]">
+        <span className="block truncate font-semibold text-ink">{scan.name}</span>
+        <span className="block text-sm text-muted">
           {count} {count === 1 ? 'page' : 'pages'} · {DATE.format(scan.updatedAt)}
         </span>
       </span>

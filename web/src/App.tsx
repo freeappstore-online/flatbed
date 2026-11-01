@@ -72,21 +72,21 @@ function About() {
   return (
     <>
       <PageHeader title="About" />
-      <p className="text-[var(--muted)]">
+      <p className="text-muted">
         Flatbed turns your phone's camera into a document scanner: capture pages, crop and straighten them, clean
         them up and save them as a PDF. Everything happens on your device; your images and PDFs are never uploaded.
         No account, no ads, no subscription.
       </p>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {FEATURES.map((feature) => (
-          <li key={feature.name} className="rounded-[var(--radius)] border border-[var(--line)] p-4">
-            <p className="font-semibold text-[var(--ink)]">{feature.name}</p>
-            <p className="text-sm text-[var(--muted)]">{feature.what}</p>
+          <li key={feature.name} className="rounded-fas border border-line p-4">
+            <p className="font-semibold text-ink">{feature.name}</p>
+            <p className="text-sm text-muted">{feature.what}</p>
           </li>
         ))}
       </ul>
       <PrivacyNote />
-      <p className="mt-6 text-[var(--muted)]">
+      <p className="mt-6 text-muted">
         Flatbed is a free, MIT-licensed app on{' '}
         <a href="https://freeappstore.online" className="underline">
           FreeAppStore

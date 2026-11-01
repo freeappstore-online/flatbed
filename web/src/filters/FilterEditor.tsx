@@ -97,7 +97,7 @@ export function FilterEditor({
   }
 
   const name = FILTERS.find((f) => f.id === filter)?.name
-  const button = 'rounded-full bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
+  const button = 'rounded-full bg-capture-ink/15 px-4 py-2 text-sm font-semibold disabled:opacity-40'
 
   return (
     <FullScreen label={title}>
@@ -109,9 +109,9 @@ export function FilterEditor({
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-        {state.kind === 'loading' && <p className="text-white/80">Opening the page…</p>}
+        {state.kind === 'loading' && <p className="text-capture-ink/80">Opening the page…</p>}
         {state.kind === 'failed' && (
-          <p role="alert" className="max-w-sm text-center text-white/90">
+          <p role="alert" className="max-w-sm text-center text-capture-ink/90">
             Couldn't open this image, so no filter can be applied. Keep it as it is.
           </p>
         )}
@@ -120,12 +120,12 @@ export function FilterEditor({
             ref={canvas}
             role="img"
             aria-label={`Preview: ${name}`}
-            className="max-h-full max-w-full rounded bg-white object-contain"
+            className="max-h-full max-w-full rounded bg-capture-ink object-contain"
           />
         )}
       </div>
 
-      <p className="px-4 text-center text-sm text-white/90" aria-live="polite">
+      <p className="px-4 text-center text-sm text-capture-ink/90" aria-live="polite">
         {working ? 'Applying…' : error}
       </p>
 
@@ -162,7 +162,7 @@ export function FilterEditor({
             type="button"
             onClick={apply}
             disabled={state.kind !== 'ready' || working}
-            className="rounded-full bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
+            className="rounded-full bg-capture-ink px-6 py-3 font-semibold text-capture-paper disabled:opacity-40"
           >
             Done
           </button>

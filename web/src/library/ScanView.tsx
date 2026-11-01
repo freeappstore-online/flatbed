@@ -96,7 +96,7 @@ export function ScanView({
   }
   const reorder = usePageReorder(pages.map((page) => page.id), (from, to) => move(from, to - from))
 
-  if (scan === undefined) return <p className="text-[var(--muted)]">Opening the scan…</p>
+  if (scan === undefined) return <p className="text-muted">Opening the scan…</p>
   if (scan === null)
     return (
       <>
@@ -145,51 +145,51 @@ export function ScanView({
         }
       />
       {error && (
-        <p role="alert" className="mt-3 text-sm text-[var(--danger)]">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       )}
-      {draftState?.failed && <p role="alert" className="mt-3 text-sm text-[var(--danger)]">Couldn't check for unfinished pages. New pages may not be recoverable if this tab closes.</p>}
-      {draft && !capturing && <section aria-label="Unfinished scan" className="mt-4 rounded-[var(--radius)] border border-[var(--line-strong)] p-4">
+      {draftState?.failed && <p role="alert" className="mt-3 text-sm text-danger">Couldn't check for unfinished pages. New pages may not be recoverable if this tab closes.</p>}
+      {draft && !capturing && <section aria-label="Unfinished scan" className="mt-4 rounded-fas border border-line-strong p-4">
         <h2 className="font-semibold">Unfinished scan</h2>
         <p className="mt-1 text-sm">{draft.pages.length} {draft.pages.length === 1 ? 'page was' : 'pages were'} saved on this device before you left. {draft.kind === 'append' && draft.scanId === scanId ? 'Resume adding these pages, or discard them.' : 'Return to All scans to resume or discard them.'}</p>
         {draft.kind === 'append' && draft.scanId === scanId && <div className="mt-3 flex gap-3">
-          <button type="button" className="rounded-[var(--radius-sm)] bg-[var(--ink)] px-4 py-2 font-semibold text-[var(--paper)]" onClick={() => { setResumePages(draft.pages.map(draftPage)); setCapturing(true) }}>Resume</button>
-          <button type="button" className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-4 py-2" onClick={() => { void store.discardDraft().catch(() => setError("Couldn't discard the draft. Try again.")) }}>Discard</button>
+          <button type="button" className="rounded-fas-sm bg-ink px-4 py-2 font-semibold text-paper" onClick={() => { setResumePages(draft.pages.map(draftPage)); setCapturing(true) }}>Resume</button>
+          <button type="button" className="rounded-fas-sm border border-line-strong px-4 py-2" onClick={() => { void store.discardDraft().catch(() => setError("Couldn't discard the draft. Try again.")) }}>Discard</button>
         </div>}
       </section>}
 
       <section className="mt-6" aria-labelledby="pages-heading">
         <div className="flex items-center justify-between gap-3">
-          <h2 id="pages-heading" className="font-semibold text-[var(--ink)]">
+          <h2 id="pages-heading" className="font-semibold text-ink">
             {pages.length} {pages.length === 1 ? 'page' : 'pages'}
           </h2>
           <button
             type="button"
             onClick={() => { setResumePages([]); setCapturing(true) }}
             disabled={!draftState || !!draft}
-            className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--panel-strong)] disabled:opacity-40"
+            className="rounded-fas-sm border border-line-strong px-3 py-2 text-sm font-semibold text-ink hover:bg-panel-strong disabled:opacity-40"
           >
             Add pages
           </button>
         </div>
-        {pages.length === 0 && <p className="mt-2 text-sm text-[var(--muted)]">This scan has no pages. Add some to export it.</p>}
-        {pages.length > 1 && <p className="mt-2 text-sm text-[var(--muted)]">Drag a Move handle, or choose Move and then tap a destination page.</p>}
-        {reorder.movingId && <p role="status" className="mt-2 text-sm text-[var(--ink)]">Choose the new position for page {reorder.movingNumber}. Tap a page thumbnail, or choose Move again to cancel.</p>}
+        {pages.length === 0 && <p className="mt-2 text-sm text-muted">This scan has no pages. Add some to export it.</p>}
+        {pages.length > 1 && <p className="mt-2 text-sm text-muted">Drag a Move handle, or choose Move and then tap a destination page.</p>}
+        {reorder.movingId && <p role="status" className="mt-2 text-sm text-ink">Choose the new position for page {reorder.movingNumber}. Tap a page thumbnail, or choose Move again to cancel.</p>}
         <ol className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3" onDragStart={(event) => event.preventDefault()}>
           {pages.map((page, i) => (
-            <li key={page.id} data-reorder-id={page.id} className={`rounded-[var(--radius)] border border-[var(--line)] p-2 ${reorder.target === page.id ? 'ring-2 ring-[var(--ink)]' : ''} ${reorder.dragging === page.id ? 'opacity-60' : ''}`}>
+            <li key={page.id} data-reorder-id={page.id} className={`rounded-fas border border-line p-2 ${reorder.target === page.id ? 'ring-2 ring-ink' : ''} ${reorder.dragging === page.id ? 'opacity-60' : ''}`}>
               <button type="button" onClick={() => { if (!reorder.choose(page.id)) setReviewing(page.id) }} aria-label={reorder.movingId ? `Place page ${reorder.movingNumber} at position ${i + 1}` : `Review page ${i + 1}`} className="block w-full rounded">
                 <img src={page.url} alt={`Page ${i + 1}`} draggable={false} className="aspect-[3/4] w-full rounded object-cover" />
               </button>
-              <p className="mt-2 text-sm text-[var(--muted)]">
+              <p className="mt-2 text-sm text-muted">
                 Page {i + 1}
                 {page.filter && page.filter !== 'original' && (
                   <> · {FILTERS.find((f) => f.id === page.filter)?.name}</>
                 )}
               </p>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-                <button type="button" disabled={pages.length < 2} {...reorder.handle(page.id)} aria-label={`Move page ${i + 1}`} aria-pressed={reorder.movingId === page.id} className="inline-flex min-h-11 touch-none items-center rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 font-semibold disabled:opacity-40">Move</button>
+                <button type="button" disabled={pages.length < 2} {...reorder.handle(page.id)} aria-label={`Move page ${i + 1}`} aria-pressed={reorder.movingId === page.id} className="inline-flex min-h-11 touch-none items-center rounded-fas-sm border border-line-strong px-3 font-semibold disabled:opacity-40">Move</button>
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className={link} aria-label={`Move page ${i + 1} earlier`}>
                   ↑
                 </button>
@@ -334,7 +334,7 @@ function NameEditor({ name, onRename }: { name: string; onRename: (name: string)
 
   return (
     <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-      <label className="grid gap-1 text-sm font-semibold text-[var(--ink)]">
+      <label className="grid gap-1 text-sm font-semibold text-ink">
         Name
         <input
           // Focus follows the person's own tap on Rename.
@@ -343,16 +343,16 @@ function NameEditor({ name, onRename }: { name: string; onRename: (name: string)
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
           maxLength={120}
-          className="w-64 max-w-full rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--paper)] px-3 py-2 font-normal text-[var(--ink)]"
+          className="w-64 max-w-full rounded-fas-sm border border-line-strong bg-paper px-3 py-2 font-normal text-ink"
         />
       </label>
-      <button type="submit" className="rounded-[var(--radius-sm)] bg-[var(--ink)] px-3 py-2 text-sm font-semibold text-[var(--paper)]">
+      <button type="submit" className="rounded-fas-sm bg-ink px-3 py-2 text-sm font-semibold text-paper">
         Save
       </button>
       <button
         type="button"
         onClick={() => setEditing(false)}
-        className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 py-2 text-sm font-semibold text-[var(--ink)]"
+        className="rounded-fas-sm border border-line-strong px-3 py-2 text-sm font-semibold text-ink"
       >
         Cancel
       </button>
@@ -366,15 +366,15 @@ function DeleteScan({ name, pages, onDelete }: { name: string; pages: number; on
   return (
     <section className="mt-6" aria-label="Delete scan">
       {confirming ? (
-        <div role="alertdialog" aria-labelledby="delete-question" className="rounded-[var(--radius)] border border-[var(--danger)] p-4">
-          <p id="delete-question" className="text-sm text-[var(--ink)]">
+        <div role="alertdialog" aria-labelledby="delete-question" className="rounded-fas border border-danger p-4">
+          <p id="delete-question" className="text-sm text-ink">
             Delete “{name}” and its {pages} {pages === 1 ? 'page' : 'pages'} from this device? This can't be undone.
           </p>
           <div className="mt-3 flex gap-2">
             <button
               type="button"
               onClick={onDelete}
-              className="rounded-[var(--radius-sm)] bg-[var(--danger)] px-3 py-2 text-sm font-semibold text-[var(--paper)]"
+              className="rounded-fas-sm bg-danger px-3 py-2 text-sm font-semibold text-paper"
             >
               Delete
             </button>
@@ -383,14 +383,14 @@ function DeleteScan({ name, pages, onDelete }: { name: string; pages: number; on
               // Focus the safe choice first.
               autoFocus
               onClick={() => setConfirming(false)}
-              className="rounded-[var(--radius-sm)] border border-[var(--line-strong)] px-3 py-2 text-sm font-semibold text-[var(--ink)]"
+              className="rounded-fas-sm border border-line-strong px-3 py-2 text-sm font-semibold text-ink"
             >
               Keep it
             </button>
           </div>
         </div>
       ) : (
-        <button type="button" onClick={() => setConfirming(true)} className="text-sm text-[var(--danger)] underline">
+        <button type="button" onClick={() => setConfirming(true)} className="text-sm text-danger underline">
           Delete scan
         </button>
       )}
