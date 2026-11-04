@@ -137,6 +137,39 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
     test.use({ colorScheme })
 
+    test('SDK accent action keeps AA contrast in interaction states', async ({ page }) => {
+      await page.goto('/')
+      const action = page.locator('button.bg-accent').first()
+      await expect(action).toBeVisible()
+      for (const state of ['default', 'hover', 'focus', 'active'] as const) {
+        if (state === 'hover') await action.hover()
+        if (state === 'focus') await action.focus()
+        if (state === 'active') await page.mouse.down()
+        try {
+          const ratio = await action.evaluate((button) => {
+            const luminance = (color: string) => {
+              const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map((n) => {
+                const value = n / 255
+                return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+              })
+              return channels.reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0)
+            }
+            const style = getComputedStyle(button)
+            const values = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => b - a)
+            return (values[0] + 0.05) / (values[1] + 0.05)
+          })
+          expect(ratio, `${colorScheme} accent action in ${state}`).toBeGreaterThanOrEqual(4.5)
+          await expectAccessible(page, `${colorScheme} accent action in ${state}`)
+        } finally {
+          // Release away from the button so the active-state check does not sign in.
+          if (state === 'active') {
+            await page.mouse.move(0, 0)
+            await page.mouse.up()
+          }
+        }
+      }
+    })
+
     test('capture → crop → filter → 2-page PDF', async ({ page }) => {
       await useFakeCamera(page)
       await page.goto('/')

@@ -14,6 +14,7 @@
   --color-panel-strong: var(--panel-strong);
   --color-panel-quiet: var(--panel-quiet);
   --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
   --color-accent-deep: var(--accent-deep);
   --color-success: var(--success);
@@ -101,7 +102,8 @@
   --panel: rgb(255, 255, 255);
   --panel-strong: rgb(255, 255, 255);
   --panel-quiet: rgb(255, 255, 255);
-  --accent: #d86f4d;
+  --accent: #b45c40;
+  --accent-fg: #ffffff;
   --accent-soft: #ffd4bf;
   --accent-deep: #9f4427;
   --sky: #4c97b5;
@@ -154,6 +156,7 @@
   --panel-strong: rgb(18, 18, 18);
   --panel-quiet: rgb(22, 22, 22);
   --accent: #ff9b76;
+  --accent-fg: #111111;
   --accent-soft: #3b2119;
   --accent-deep: #ffd9cb;
   --sky: #89cbe5;
@@ -290,10 +293,12 @@ a:focus-visible {
 
 /* Shell's text-size preference scales rem-based app typography. */
 
-/* The SDK's Sign in button is white on --accent (3.3:1 light, 2.1:1 dark),
-   below WCAG AA for its 14px text. Use the deep accent with paper text instead
-   (white on #9f4427, near-black on #ffd9cb). Its colours are inline styles,
-   hence !important. */
+/* Older SDK components hard-code text-white on bg-accent. Pair their text
+   with the theme foreground until the SDK uses text-accent-fg itself.
+   Keep this outside layers so it overrides the SDK's Tailwind utility. */
+.bg-accent.text-white {
+  @apply text-accent-fg;
+}
 
 /* With Sign in kept on one line, the Shell header (Free · Flatbed · menu ·
    text size · theme · Sign in) is ~14px too wide for a 320px phone. Below
@@ -304,8 +309,8 @@ a:focus-visible {
 :root[data-text='lg'] { font-size: 112.5%; }
 :root[data-text='sm'] { font-size: 87.5%; }
 header button[style*='--accent'] {
-  background: var(--accent-deep) !important;
-  color: var(--paper) !important;
+  background: var(--accent) !important;
+  color: var(--accent-fg) !important;
   white-space: nowrap;
 }
 @media (max-width: 359px) {
