@@ -97,7 +97,11 @@ describe('FilterEditor', () => {
     await ready()
     expect((screen.getByRole('slider', { name: 'Brightness' }) as HTMLInputElement).value).toBe('20')
     expect((screen.getByRole('slider', { name: 'Contrast' }) as HTMLInputElement).value).toBe('-10')
-    fireEvent.change(screen.getByRole('slider', { name: 'Brightness' }), { target: { value: '40' } })
+    const brightness = screen.getByRole('slider', { name: 'Brightness' }) as HTMLInputElement
+    // Range controls emit input while adjusting. Wait for the rendered state,
+    // rather than just the DOM value assigned by fireEvent, before saving.
+    fireEvent.input(brightness, { target: { value: '40' } })
+    await waitFor(() => expect(brightness.closest('label')?.querySelector('output')?.textContent).toBe('+40%'))
     fireEvent.click(choice('Done'))
     await waitFor(() => expect(onApply).toHaveBeenCalled())
     expect(onApply.mock.calls[0][1]).toEqual({ brightness: 40, contrast: -10 })
