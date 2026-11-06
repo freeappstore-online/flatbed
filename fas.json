@@ -1,6 +1,0 @@
-{
-  "appId": "flatbed",
-  "applicationRoot": "web",
-  "outputPath": "web/dist",
-  "buildCommand": "pnpm build"
-}
